@@ -118,13 +118,13 @@ function SanctuaryView({
                         <div onClick={() => setSanctuaryMode('masters')} className={`${styles.masters.card} p-6 rounded-[32px] border cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md relative overflow-hidden group`}>
                             <div className="absolute right-0 top-0 p-4 opacity-10"><i className={`ph-duotone ${dailyPhilosopher?.icon || 'ph-student'} text-6xl`}></i></div>
                             <i className={`ph-duotone ph-student text-4xl ${styles.masters.icon} relative z-10`}></i>
-                            <div className="relative z-10"><h3 className={`serif ${styles.masters.title}`}>Maestros</h3><p className={`text-[9px] uppercase font-bold ${styles.masters.sub}`}>Biografías</p></div>
+                            <div className="relative z-10"><h3 className={`serif text-lg font-bold ${styles.masters.title}`}>Maestros</h3><p className={`text-[9px] uppercase font-bold ${styles.masters.sub}`}>Biografías</p></div>
                         </div>
 
                         {/* SCHOOLS */}
                         <div onClick={() => setSanctuaryMode('schools')} className={`${styles.schools.card} p-6 rounded-[32px] border cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md`}>
                             <i className={`ph-duotone ph-columns text-4xl ${styles.schools.icon}`}></i>
-                            <div><h3 className={`serif ${styles.schools.title}`}>Escuelas</h3><p className={`text-[9px] uppercase font-bold ${styles.schools.sub}`}>Tradiciones</p></div>
+                            <div><h3 className={`serif text-lg font-bold ${styles.schools.title}`}>Escuelas</h3><p className={`text-[9px] uppercase font-bold ${styles.schools.sub}`}>Tradiciones</p></div>
                         </div>
 
                         {/* ORACLE */}
