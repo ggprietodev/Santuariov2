@@ -1,0 +1,22 @@
+{
+  "name": " Santurario v3",
+  "short_name": "Santuario",
+  "description": "Filosofía estoica compartida.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/000000/FFFFFF?text=S",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/000000/FFFFFF?text=S",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "requestFramePermissions": []
+}
