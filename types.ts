@@ -9,6 +9,7 @@ export interface UserProfile {
     avatar: string;
     banner: string;
     website?: string;
+    birth_date?: string; // NEW: Memento Mori
     joinedAt?: string;
 }
 

@@ -34,6 +34,13 @@ export const updateUserPassword = async (password: string) => {
     return error;
 };
 
+export const updateUserBirthDate = async (date: string | null) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return "No user";
+    const { error } = await supabase.from('profiles').update({ birth_date: date }).eq('id', user.id);
+    return error;
+}
+
 // Glossary Helper
 export const fetchGlossaryTerm = async (term: string): Promise<GlossaryTerm | null> => {
     try {
