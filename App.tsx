@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions } from './services/supabase';
 import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction } from './types';
@@ -38,7 +37,8 @@ function SanctuaryView({
     dailyTask,
     userInteractions,
     onWorkInteractionUpdate,
-    onPlayerToggle 
+    onPlayerToggle,
+    theme 
 }: any) {
     
     const handleModuleBack = () => {
@@ -48,6 +48,72 @@ function SanctuaryView({
         } else {
             setSanctuaryMode('menu');
         }
+    };
+
+    // --- LÓGICA DE ESTILOS PERSONALIZADA ---
+    const isCustomTheme = useMemo(() => !['light', 'dark'].includes(theme), [theme]);
+
+    const getCardClasses = (defaultColorBg: string, defaultBorder: string, defaultIconColor: string, defaultTitleColor: string, defaultSubColor: string, defaultBox: string) => {
+        if (isCustomTheme) {
+            // Valores por defecto para temas custom
+            let cardBg = `bg-[var(--card)]`;
+            let cardBorder = `border-[var(--border)]`;
+            let textColor = `text-[var(--text-main)]`;
+            let subColor = `text-[var(--text-sub)] opacity-60`;
+            let boxClass = `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)]`;
+
+            // Personalización profunda por tema (Tarjeta oscura + Texto claro)
+            if (theme === 'ocean') {
+                cardBg = 'bg-cyan-950';
+                cardBorder = 'border-cyan-800';
+                textColor = 'text-cyan-50';
+                subColor = 'text-cyan-200 opacity-60';
+                boxClass = 'bg-cyan-900 text-cyan-200 border border-cyan-700 shadow-inner'; 
+            } else if (theme === 'forest') {
+                cardBg = 'bg-emerald-950';
+                cardBorder = 'border-emerald-800';
+                textColor = 'text-emerald-50';
+                subColor = 'text-emerald-200 opacity-60';
+                boxClass = 'bg-emerald-900 text-emerald-200 border border-emerald-700 shadow-inner';
+            } else if (theme === 'sunset') {
+                cardBg = 'bg-orange-950';
+                cardBorder = 'border-orange-800';
+                textColor = 'text-orange-50';
+                subColor = 'text-orange-200 opacity-60';
+                boxClass = 'bg-orange-900 text-orange-200 border border-orange-700 shadow-inner';
+            }
+
+            return {
+                card: `${cardBg} ${cardBorder} border shadow-sm group transition-all hover:scale-[1.02] active:scale-95 duration-300 h-full`,
+                icon: `${textColor} opacity-90 transition-transform group-hover:scale-110 duration-300`,
+                title: textColor,
+                sub: `text-[9px] uppercase font-bold ${subColor}`,
+                box: `${boxClass} transition-all group-hover:scale-110 duration-300 shadow-sm` 
+            };
+        }
+        
+        // Estilo Colorido Original (Día/Noche)
+        return {
+            card: `${defaultColorBg} ${defaultBorder} transition-all border h-full group hover:shadow-md hover:scale-[1.02] active:scale-95 duration-300`,
+            icon: `${defaultIconColor} transition-transform group-hover:scale-110 duration-300`,
+            title: defaultTitleColor,
+            sub: defaultSubColor,
+            box: `${defaultBox} transition-transform group-hover:scale-110 duration-300 shadow-sm`
+        };
+    };
+
+    const styles = {
+        // AHORA TODOS TIENEN UN 'box' DEFINIDO (último argumento)
+        path: getCardClasses("bg-[#FAF5FF] dark:bg-[#1E1024]", "border-fuchsia-100 dark:border-fuchsia-900/20", "text-fuchsia-500", "text-fuchsia-900 dark:text-fuchsia-50", "text-fuchsia-800 dark:text-fuchsia-200", "bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-600 dark:text-fuchsia-300"),
+        masters: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
+        schools: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
+        oracle: getCardClasses("bg-purple-50 dark:bg-purple-900/10", "border-purple-100 dark:border-purple-900/20", "text-purple-500/10", "text-purple-900 dark:text-purple-50", "text-purple-800 dark:text-purple-200", "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"),
+        library: getCardClasses("bg-[#FFF7ED] dark:bg-[#2C1810]", "border-orange-100 dark:border-orange-900/20", "text-orange-500/10", "text-orange-900 dark:text-orange-50", "text-orange-800 dark:text-orange-200", "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300"),
+        works: getCardClasses("bg-[#F0FDF4] dark:bg-[#052E16]", "border-emerald-100 dark:border-emerald-900/20", "text-emerald-500/10", "text-emerald-900 dark:text-emerald-50", "text-emerald-800 dark:text-emerald-200", "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300"),
+        arena: getCardClasses("bg-[#FFFBEB] dark:bg-[#2C2410]", "border-amber-100 dark:border-amber-900/20", "text-amber-500", "text-amber-900 dark:text-amber-50", "text-amber-800 dark:text-amber-200", "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300"),
+        citadel: getCardClasses("bg-stone-100 dark:bg-stone-900", "border-[var(--border)]", "text-[var(--text-sub)] opacity-10", "text-[var(--text-main)]", "opacity-60", "bg-[var(--text-main)] text-[var(--bg)]"),
+        glossary: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-sub)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
+        stats: getCardClasses("bg-[#Fdf4f0] dark:bg-[#2e1a16]", "border-rose-100 dark:border-rose-900/20", "text-rose-500", "text-rose-900 dark:text-rose-50", "text-rose-800 dark:text-rose-200", "bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300")
     };
 
     return (
@@ -68,50 +134,134 @@ function SanctuaryView({
 
                 <div className="w-full max-w-2xl px-6 pb-32">
                     <div className="grid grid-cols-2 gap-4 auto-rows-[160px]">
-                        <div onClick={() => setSanctuaryMode('path')} className="bg-[#FAF5FF] dark:bg-[#1E1024] p-6 rounded-[32px] border border-fuchsia-100 dark:border-fuchsia-900/20 cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md">
-                            <i className="ph-duotone ph-path text-4xl text-fuchsia-500"></i>
-                            <div><h3 className="serif text-lg font-bold text-fuchsia-900 dark:text-fuchsia-50">Camino</h3><p className="text-[9px] uppercase font-bold opacity-60 text-fuchsia-800 dark:text-fuchsia-200">Cursos</p></div>
+                        {/* CAMINO */}
+                        <div onClick={() => setSanctuaryMode('path')} className={`${styles.path.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.path.box}`}>
+                                    <i className="ph-duotone ph-path text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.path.title}`}>Camino</h3>
+                                <p className={`${styles.path.sub}`}>Cursos</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('masters')} className="bg-[var(--card)] p-6 rounded-[32px] border border-[var(--border)] cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md relative overflow-hidden group">
-                            <div className="absolute right-0 top-0 p-4 opacity-10"><i className={`ph-duotone ${dailyPhilosopher?.icon || 'ph-student'} text-6xl`}></i></div>
-                            <i className="ph-duotone ph-student text-4xl text-[var(--text-main)] relative z-10"></i>
-                            <div className="relative z-10"><h3 className="serif text-lg font-bold">Maestros</h3><p className="text-[9px] uppercase font-bold opacity-60">Biografías</p></div>
+
+                        {/* MAESTROS */}
+                        <div onClick={() => setSanctuaryMode('masters')} className={`${styles.masters.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.masters.box}`}>
+                                    <i className="ph-duotone ph-student text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.masters.title}`}>Maestros</h3>
+                                <p className={`${styles.masters.sub}`}>Biografías</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('schools')} className="bg-[var(--card)] p-6 rounded-[32px] border border-[var(--border)] cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md">
-                            <i className="ph-duotone ph-columns text-4xl text-[var(--text-main)]"></i>
-                            <div><h3 className="serif text-lg font-bold">Escuelas</h3><p className="text-[9px] uppercase font-bold opacity-60">Tradiciones</p></div>
+
+                        {/* ESCUELAS */}
+                        <div onClick={() => setSanctuaryMode('schools')} className={`${styles.schools.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                             <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.schools.box}`}>
+                                    <i className="ph-duotone ph-columns text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.schools.title}`}>Escuelas</h3>
+                                <p className={`${styles.schools.sub}`}>Tradiciones</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('oracle')} className="col-span-1 bg-purple-50 dark:bg-purple-900/10 p-6 rounded-[32px] border border-purple-100 dark:border-purple-900/20 cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden group hover:shadow-md flex flex-col justify-between">
-                             <i className="ph-duotone ph-magic-wand absolute -right-4 -bottom-4 text-8xl text-purple-500/10 group-hover:scale-110 transition-transform"></i>
-                             <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 flex items-center justify-center z-10"><i className="ph-bold ph-sparkle text-lg"></i></div>
-                             <div className="relative z-10"><h3 className="serif text-lg font-bold text-purple-900 dark:text-purple-50">Oráculo</h3><p className="text-[9px] uppercase font-bold opacity-60 text-purple-800 dark:text-purple-200">Consultas</p></div>
+
+                        {/* ORÁCULO */}
+                        <div onClick={() => setSanctuaryMode('oracle')} className={`${styles.oracle.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                             <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.oracle.box}`}>
+                                    <i className="ph-bold ph-sparkle text-xl"></i>
+                                </div>
+                             </div>
+                             <div>
+                                <h3 className={`serif text-lg font-bold ${styles.oracle.title}`}>Oráculo</h3>
+                                <p className={`${styles.oracle.sub}`}>Consultas</p>
+                             </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('library')} className="col-span-1 bg-[#FFF7ED] dark:bg-[#2C1810] p-6 rounded-[32px] border border-orange-100 dark:border-orange-900/20 cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden group hover:shadow-md flex flex-col justify-between">
-                             <i className="ph-duotone ph-books absolute -right-4 -bottom-4 text-8xl text-orange-500/10 group-hover:scale-110 transition-transform"></i>
-                             <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300 flex items-center justify-center z-10"><i className="ph-bold ph-book-open text-lg"></i></div>
-                             <div className="relative z-10"><h3 className="serif text-lg font-bold text-orange-900 dark:text-orange-50">Biblioteca</h3><p className="text-[9px] uppercase font-bold opacity-60 text-orange-800 dark:text-orange-200">Citas</p></div>
+
+                        {/* BIBLIOTECA */}
+                        <div onClick={() => setSanctuaryMode('library')} className={`${styles.library.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                             <div className="flex justify-start">
+                                 <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.library.box}`}>
+                                    <i className="ph-bold ph-book-open text-xl"></i>
+                                 </div>
+                             </div>
+                             <div>
+                                <h3 className={`serif text-lg font-bold ${styles.library.title}`}>Biblioteca</h3>
+                                <p className={`${styles.library.sub}`}>Citas</p>
+                             </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('works')} className="col-span-1 bg-[#F0FDF4] dark:bg-[#052E16] p-6 rounded-[32px] border border-emerald-100 dark:border-emerald-900/20 cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md group relative overflow-hidden">
-                            <i className="ph-duotone ph-book-bookmark absolute -right-4 -bottom-4 text-8xl text-emerald-500/10 group-hover:scale-110 transition-transform"></i>
-                            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300 flex items-center justify-center z-10"><i className="ph-bold ph-read-cv-logo text-lg"></i></div>
-                            <div className="relative z-10"><h3 className="serif text-lg font-bold text-emerald-900 dark:text-emerald-50">Obras</h3><p className="text-[9px] uppercase font-bold opacity-60 text-emerald-800 dark:text-emerald-200">Libros</p></div>
+
+                        {/* OBRAS */}
+                        <div onClick={() => setSanctuaryMode('works')} className={`${styles.works.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.works.box}`}>
+                                    <i className="ph-bold ph-read-cv-logo text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.works.title}`}>Obras</h3>
+                                <p className={`${styles.works.sub}`}>Libros</p>
+                            </div>
                         </div>
-                         <div onClick={() => setSanctuaryMode('arena')} className="col-span-1 bg-[#FFFBEB] dark:bg-[#2C2410] p-6 rounded-[32px] border border-amber-100 dark:border-amber-900/20 cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between relative overflow-hidden group hover:shadow-md">
-                            <i className="ph-fill ph-sword text-4xl text-amber-500"></i>
-                            <div><h3 className="serif text-lg font-bold text-amber-900 dark:text-amber-50">Arena</h3><p className="text-[9px] uppercase font-bold opacity-60 text-amber-800 dark:text-amber-200">Reto</p></div>
+
+                         {/* ARENA */}
+                         <div onClick={() => setSanctuaryMode('arena')} className={`${styles.arena.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.arena.box}`}>
+                                    <i className="ph-fill ph-sword text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.arena.title}`}>Arena</h3>
+                                <p className={`${styles.arena.sub}`}>Reto</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('citadel')} className="col-span-1 bg-stone-100 dark:bg-stone-900 p-6 rounded-[32px] border border-[var(--border)] cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md relative overflow-hidden group">
-                            <i className="ph-duotone ph-castle-turret absolute -right-6 -bottom-4 text-8xl text-[var(--text-sub)] opacity-10 group-hover:scale-110 transition-transform"></i>
-                            <div className="w-10 h-10 rounded-full bg-[var(--text-main)] text-[var(--bg)] flex items-center justify-center z-10"><i className="ph-bold ph-castle-turret text-lg"></i></div>
-                            <div className="relative z-10"><h3 className="serif text-lg font-bold">Ciudadela</h3><p className="text-[9px] uppercase font-bold opacity-60">Meditación</p></div>
+
+                        {/* CIUDADELA */}
+                        <div onClick={() => setSanctuaryMode('citadel')} className={`${styles.citadel.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.citadel.box}`}>
+                                    <i className="ph-bold ph-castle-turret text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.citadel.title}`}>Ciudadela</h3>
+                                <p className={`${styles.citadel.sub}`}>Meditación</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('glossary')} className="bg-[var(--card)] p-6 rounded-[32px] border border-[var(--border)] cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md">
-                            <i className="ph-duotone ph-book-bookmark text-4xl text-[var(--text-sub)]"></i>
-                            <div><h3 className="serif text-lg font-bold">Léxico</h3><p className="text-[9px] uppercase font-bold opacity-60">Glosario</p></div>
+
+                        {/* GLOSARIO */}
+                        <div onClick={() => setSanctuaryMode('glossary')} className={`${styles.glossary.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.glossary.box}`}>
+                                    <i className="ph-duotone ph-book-bookmark text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.glossary.title}`}>Léxico</h3>
+                                <p className={`${styles.glossary.sub}`}>Glosario</p>
+                            </div>
                         </div>
-                        <div onClick={() => setSanctuaryMode('stats')} className="bg-[#Fdf4f0] dark:bg-[#2e1a16] p-6 rounded-[32px] border border-rose-100 dark:border-rose-900/20 cursor-pointer active:scale-[0.98] transition-all flex flex-col justify-between hover:shadow-md">
-                            <i className="ph-fill ph-chart-bar text-3xl text-rose-500"></i>
-                            <div><h3 className="serif text-lg font-bold text-rose-900 dark:text-rose-50">Legado</h3><p className="text-[9px] uppercase font-bold opacity-60 text-rose-800 dark:text-rose-200">Stats</p></div>
+
+                        {/* LEGADO */}
+                        <div onClick={() => setSanctuaryMode('stats')} className={`${styles.stats.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
+                            <div className="flex justify-start">
+                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.stats.box}`}>
+                                    <i className="ph-fill ph-chart-bar text-xl"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className={`serif text-lg font-bold ${styles.stats.title}`}>Legado</h3>
+                                <p className={`${styles.stats.sub}`}>Stats</p>
+                            </div>
                         </div>
                     </div>
                  </div>
@@ -119,7 +269,7 @@ function SanctuaryView({
 
             {sanctuaryMode === 'library' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><LibraryModule user={user} readings={masterReadings} savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} onShare={onShare} schools={masterSchools} philosophers={masterPhilosophers} /></div>}
             {sanctuaryMode === 'works' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><WorksManager works={masterWorks} philosophers={masterPhilosophers} onBack={handleModuleBack} onWorkAdded={onWorkAdded} onWorkDeleted={onWorkDeleted} userInteractions={userInteractions} onInteractionUpdate={onWorkInteractionUpdate} /></div>}
-            {sanctuaryMode === 'oracle' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><OracleModule savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} philosophers={masterPhilosophers} /></div>}
+            {sanctuaryMode === 'oracle' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><OracleModule savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} philosophers={masterPhilosophers} schools={masterSchools} /></div>}
             {sanctuaryMode === 'citadel' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><CitadelModule onBack={handleModuleBack} meditations={masterMeditations} initialActiveMeditation={initialActiveMeditation} onPlayerToggle={onPlayerToggle} /></div>}
             {sanctuaryMode === 'stats' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><StatsModule journal={journal} user={user} savedReadings={savedReadings} onBack={handleModuleBack} /></div>}
             {sanctuaryMode === 'arena' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><ArenaModule journal={journal} onUpdateEntry={onUpdateEntry} onBack={handleModuleBack} activeChallenge={activeChallenge} onShare={onShare} tasks={masterTasks} dichotomies={masterDichotomies} dailyTask={dailyTask} /></div>}
@@ -468,7 +618,7 @@ export default function App() {
                 {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} />}
                 {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} />}
                 {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} />}
-                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} />}
+                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} />}
              </main>
              
              {/* Main Navbar */}
