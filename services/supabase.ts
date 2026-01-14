@@ -88,24 +88,34 @@ export const fetchSchools = async (): Promise<PhilosophySchool[]> => {
 }
 
 export const fetchReadings = async (): Promise<Reading[]> => {
-    // Fetch a sample or all readings. For performance, maybe limit or paginate in future.
-    const { data, error } = await supabase
-        .from('content_readings')
-        .select('*');
+    try {
+        const { data, error } = await supabase
+            .from('content_readings')
+            .select('*')
+            .order('id', { ascending: true }); // Orden estricto por ID para consistencia
+            
+        if (error) {
+            console.error("Error fetching readings from Supabase:", error);
+            return [];
+        }
         
-    if (error || !data) return [];
-    
-    return data.map((r: any) => ({
-        t: r.title,
-        q: r.quote,
-        b: r.body,
-        a: r.author,
-        k: r.tags,
-        type: r.type,
-        philosophy: r.philosophy,
-        id: r.id,
-        source_work_id: r.source_work_id
-    })) as Reading[];
+        if (!data || data.length === 0) return [];
+        
+        return data.map((r: any) => ({
+            t: r.title,
+            q: r.quote,
+            b: r.body || '',
+            a: r.author || 'Anónimo',
+            k: r.tags || [],
+            type: r.type,
+            philosophy: r.philosophy,
+            id: r.id,
+            source_work_id: r.source_work_id
+        })) as Reading[];
+    } catch (e) {
+        console.error("Unexpected error in fetchReadings:", e);
+        return [];
+    }
 }
 
 // --- LIBRARY WORKS ---
