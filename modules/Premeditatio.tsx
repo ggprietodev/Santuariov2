@@ -13,13 +13,11 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
     const [step, setStep] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     
-    // Search & Filter State
     const [searchTerm, setSearchTerm] = useState("");
     const [showFilters, setShowFilters] = useState(false);
     const [filterStart, setFilterStart] = useState("");
     const [filterEnd, setFilterEnd] = useState("");
 
-    // Core Data
     const [formData, setFormData] = useState<Omit<PremeditatioLog, 'id' | 'created_at' | 'user_id'>>({
         event_context: '',
         worst_case: '',
@@ -27,17 +25,13 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         virtue_response: ''
     });
 
-    // Confidence Score
     const [confidence, setConfidence] = useState(5);
-    
-    // Mantra
     const [generatedMantra, setGeneratedMantra] = useState("");
     const [isGeneratingMantra, setIsGeneratingMantra] = useState(false);
 
     const [logs, setLogs] = useState<PremeditatioLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
     
-    // AI Helper State
     const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
 
@@ -89,11 +83,22 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         }
     };
 
+    // FIXED DELETE HANDLER
     const handleDelete = async (id: string) => {
         if (window.confirm("¿Eliminar este registro permanentemente?")) {
-            // Optimistic UI update immediately
+            // 1. Optimistic UI Update (Immediate)
+            const previousLogs = [...logs];
             setLogs(prev => prev.filter(l => l.id !== id));
-            await deletePremeditatioLog(id);
+
+            // 2. Call DB
+            const error = await deletePremeditatioLog(id);
+            
+            // 3. Rollback if error
+            if (error) {
+                console.error("Delete failed", error);
+                alert("Error al eliminar. Inténtalo de nuevo.");
+                setLogs(previousLogs);
+            }
         }
     };
 
@@ -129,7 +134,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
     const filteredLogs = useMemo(() => {
         let result = logs;
 
-        // Date Filtering
         if (filterStart || filterEnd) {
             result = result.filter(log => {
                 if (!log.created_at) return false;
@@ -150,7 +154,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
             });
         }
 
-        // Text Search
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             result = result.filter(log => 
@@ -165,7 +168,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         return result;
     }, [logs, searchTerm, filterStart, filterEnd]);
 
-    // Helper for confidence color
     const getConfidenceColor = (score: number) => {
         if (score >= 8) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
         if (score >= 5) return 'text-amber-600 bg-amber-50 border-amber-200';
@@ -176,7 +178,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
     if (view === 'list') {
         return (
             <div className="flex flex-col h-full bg-[var(--bg)] animate-fade-in">
-                {/* Header */}
                 <div className="w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-5 z-20 sticky top-0 bg-[var(--bg)]/90 backdrop-blur border-b border-[var(--border)]">
                     <button onClick={onBack} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[var(--highlight)] text-[var(--text-sub)] transition-colors border border-[var(--border)] shadow-sm">
                         <i className="ph-bold ph-arrow-left"></i>
@@ -189,7 +190,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </button>
                 </div>
 
-                {/* Filter Controls */}
                 <div className="w-full max-w-2xl mx-auto px-6 pt-4 pb-2 bg-[var(--bg)] z-10 space-y-3">
                     <div className="flex gap-2">
                         <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] flex items-center gap-3 px-3 py-2 transition-colors focus-within:border-[var(--text-main)] shadow-sm flex-1">
@@ -210,7 +210,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                         </button>
                     </div>
 
-                    {/* Date Range Inputs */}
                     {showFilters && (
                         <div className="flex items-center gap-2 animate-fade-in bg-[var(--card)] p-3 rounded-xl border border-[var(--border)] shadow-sm">
                             <div className="flex-1">
@@ -252,12 +251,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     {filteredLogs.map((log) => (
                         <div key={log.id} className="relative bg-[var(--card)] p-6 rounded-[24px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all isolate">
                             
-                            {/* 
-                                BUTTON FIX: 
-                                1. z-index 100
-                                2. Aggressive event stopping on all pointer events
-                                3. Larger touch area
-                            */}
+                            {/* FIXED DELETE BUTTON */}
                             <button 
                                 type="button"
                                 onMouseDown={(e) => e.stopPropagation()}
@@ -265,7 +259,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    if(e.nativeEvent) e.nativeEvent.stopImmediatePropagation();
+                                    e.nativeEvent.stopImmediatePropagation(); // Ensure click doesn't bubble
                                     if(log.id) handleDelete(log.id);
                                 }}
                                 className="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-[var(--bg)] border border-[var(--border)] text-[var(--text-sub)] hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition-colors shadow-sm cursor-pointer z-[100]"
@@ -274,13 +268,11 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                                 <i className="ph-bold ph-trash text-lg pointer-events-none"></i>
                             </button>
 
-                            {/* Header Info */}
                             <div className="mb-4 pr-12">
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">
                                         {new Date(log.created_at!).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
                                     </span>
-                                    {/* Confidence Badge */}
                                     <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${getConfidenceColor(log.confidence_score || 5)}`}>
                                         Confianza {log.confidence_score || 5}/10
                                     </div>
@@ -292,7 +284,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                                 )}
                             </div>
 
-                            {/* Grid Content */}
                             <div className="space-y-4">
                                 <div className="pl-4 border-l-2 border-rose-200 dark:border-rose-900/50">
                                     <div className="flex items-center gap-1.5 mb-1 opacity-70">
@@ -332,30 +323,21 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         );
     }
 
-    // --- CREATE MODE (UNCHANGED) ---
     return (
         <div className="flex flex-col h-full bg-[var(--bg)] animate-fade-in relative overflow-hidden">
-            
-            {/* Header / Nav */}
             <div className="w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-6 z-20 shrink-0">
                 <button onClick={() => setView('list')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--highlight)] text-[var(--text-sub)] transition-colors border border-[var(--border)] shadow-sm">
                     <i className="ph-bold ph-list"></i>
                 </button>
-                
-                {/* Minimalist Progress */}
                 <div className="flex gap-1.5">
                     {[1, 2, 3, 4].map(idx => (
                         <div key={idx} className={`h-1 rounded-full transition-all duration-500 ${step >= idx ? 'w-6 bg-[var(--text-main)]' : 'w-1.5 bg-[var(--border)]'}`}></div>
                     ))}
                 </div>
-                
                 <div className="w-10"></div>
             </div>
 
-            {/* Scrollable Content Area */}
             <div className="flex-1 w-full max-w-xl mx-auto px-8 pb-6 overflow-y-auto no-scrollbar flex flex-col relative pt-6">
-                
-                {/* STEP 0: INTRO */}
                 {step === 0 && (
                     <div className="text-center animate-fade-in space-y-6 flex flex-col justify-center flex-1">
                         <div className="w-20 h-20 mx-auto rounded-full bg-[var(--highlight)] flex items-center justify-center mb-2 shadow-inner border border-[var(--border)]">
@@ -376,7 +358,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </div>
                 )}
 
-                {/* STEP 1: CONTEXT */}
                 {step === 1 && (
                     <div className="animate-slide-up flex flex-col flex-1 h-full">
                         <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block shrink-0 text-indigo-500">Paso 1</span>
@@ -400,7 +381,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </div>
                 )}
 
-                {/* STEP 2: WORST CASE */}
                 {step === 2 && (
                     <div className="animate-slide-up flex flex-col flex-1 h-full">
                         <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block shrink-0 text-rose-500">Paso 2</span>
@@ -415,7 +395,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                                 className="w-full h-full bg-transparent p-4 serif-text text-sm leading-loose outline-none resize-none placeholder:opacity-30 text-[var(--text-main)] border-none"
                             />
                             
-                            {/* AI Overlay */}
                             {aiSuggestion && (
                                 <div className="absolute inset-0 bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-xl animate-fade-in overflow-y-auto z-10 flex flex-col">
                                     <div className="flex justify-between items-center mb-3">
@@ -439,7 +418,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </div>
                 )}
 
-                {/* STEP 3: PREVENTION */}
                 {step === 3 && (
                     <div className="animate-slide-up flex flex-col flex-1 h-full">
                         <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block shrink-0 text-stone-500">Paso 3</span>
@@ -475,7 +453,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </div>
                 )}
 
-                {/* STEP 4: VIRTUE & CONFIDENCE */}
                 {step === 4 && (
                     <div className="animate-slide-up flex flex-col flex-1 h-full">
                         <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block shrink-0 text-emerald-500">Paso 4</span>
@@ -501,7 +478,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                             )}
                         </div>
 
-                        {/* CONFIDENCE SLIDER */}
                         <div className="py-4 border-t border-[var(--border)] mb-4">
                             <div className="flex justify-between mb-3">
                                 <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">Nivel de Confianza</span>
@@ -527,7 +503,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     </div>
                 )}
 
-                {/* STEP 5: SUMMARY & SAVE */}
                 {step === 5 && (
                     <div className="animate-fade-in flex flex-col flex-1 pb-safe pt-4">
                         <div className="text-center mb-6 shrink-0">
@@ -555,7 +530,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                                 </div>
                             </div>
 
-                            {/* MANTRA SECTION */}
                             {generatedMantra ? (
                                 <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-2xl text-center mt-4 border border-amber-100 dark:border-amber-900/20">
                                     <span className="text-[8px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2 block">Mantra</span>
@@ -590,7 +564,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                         </div>
                     </div>
                 )}
-
             </div>
         </div>
     );

@@ -47,7 +47,6 @@ export const updateUserBirthDate = async (date: string | null) => {
 export const addXP = async (userId: string, amount: number) => {
     console.log(`[XP] Iniciando transacción: Usuario ${userId} +${amount} XP`);
     try {
-        // 1. Obtener perfil actual completo para asegurar existencia
         const { data: profile, error: fetchError } = await supabase
             .from('profiles')
             .select('*')
@@ -59,15 +58,11 @@ export const addXP = async (userId: string, amount: number) => {
             return { success: false, leveledUp: false };
         }
 
-        // 2. Calcular nuevo estado
         const currentXP = profile?.xp || 0;
         const newXP = currentXP + amount;
         const levelData = calculateLevel(newXP);
         const oldLevelData = calculateLevel(currentXP);
 
-        console.log(`[XP] Calculando: ${currentXP} -> ${newXP}. Nivel: ${oldLevelData.level} -> ${levelData.level}`);
-
-        // 3. Actualizar DB (Usando update explícito)
         const { error: updateError } = await supabase
             .from('profiles')
             .update({ 
@@ -81,9 +76,6 @@ export const addXP = async (userId: string, amount: number) => {
             throw updateError;
         }
 
-        console.log("[XP] Actualización BBDD exitosa");
-
-        // 4. Retornar resultado con flag de subida de nivel
         return {
             success: true,
             leveledUp: levelData.level > oldLevelData.level,
@@ -112,8 +104,8 @@ export const savePremeditatio = async (entry: Omit<PremeditatioLog, 'id' | 'crea
             worst_case: entry.worst_case,
             prevention: entry.prevention,
             virtue_response: entry.virtue_response,
-            confidence_score: entry.confidence_score, // ADDED
-            mantra: entry.mantra, // ADDED
+            confidence_score: entry.confidence_score, 
+            mantra: entry.mantra,
             created_at: new Date().toISOString()
         });
     
@@ -135,11 +127,15 @@ export const fetchPremeditatioLogs = async (): Promise<PremeditatioLog[]> => {
 };
 
 export const deletePremeditatioLog = async (id: string) => {
-    const { error } = await supabase
-        .from('premeditatio_logs')
-        .delete()
-        .eq('id', id);
-    return error;
+    try {
+        const { error } = await supabase
+            .from('premeditatio_logs')
+            .delete()
+            .eq('id', id);
+        return error;
+    } catch (e) {
+        return e;
+    }
 };
 
 // --- CHAT HISTORY (ORACLE) ---
@@ -150,7 +146,7 @@ export const fetchChatHistory = async (userId: string) => {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: true })
-        .limit(50); // Últimos 50 mensajes para contexto
+        .limit(50);
     
     if (error || !data) return [];
     return data;
@@ -174,7 +170,7 @@ export const fetchGlossaryTerm = async (term: string): Promise<GlossaryTerm | nu
         const { data, error } = await supabase
             .from('content_glossary')
             .select('*')
-            .ilike('term', term) // Case-insensitive match
+            .ilike('term', term)
             .maybeSingle(); 
         
         if (error) throw error;
@@ -195,7 +191,7 @@ export const fetchGlossary = async (): Promise<GlossaryTerm[]> => {
     return data as GlossaryTerm[];
 }
 
-// --- NEW: CONTENT FETCHERS (READINGS & PHILOSOPHERS) ---
+// --- NEW: CONTENT FETCHERS ---
 
 export const fetchPhilosophers = async (): Promise<PhilosopherBio[]> => {
     const { data, error } = await supabase
@@ -204,10 +200,9 @@ export const fetchPhilosophers = async (): Promise<PhilosopherBio[]> => {
     
     if (error || !data) return [];
     
-    // Map DB fields to Type if needed (ensure icon, key_ideas are handled)
     return data.map((p: any) => ({
         ...p,
-        desc: p.description || p.desc || "Sin descripción disponible.", // Fix mapping
+        desc: p.description || p.desc || "Sin descripción disponible.",
         key_ideas: typeof p.key_ideas === 'string' ? JSON.parse(p.key_ideas) : p.key_ideas
     })) as PhilosopherBio[];
 }
@@ -226,7 +221,7 @@ export const fetchReadings = async (): Promise<Reading[]> => {
         const { data, error } = await supabase
             .from('content_readings')
             .select('*')
-            .order('id', { ascending: true }); // Orden estricto por ID para consistencia
+            .order('id', { ascending: true });
             
         if (error) {
             console.error("Error fetching readings from Supabase:", error);
@@ -264,7 +259,7 @@ export const fetchWorks = async (): Promise<Work[]> => {
     return data as Work[];
 }
 
-// --- TASKS & QUESTIONS (Replaces Static Data) ---
+// --- TASKS & QUESTIONS ---
 
 export const fetchTasks = async (): Promise<Task[]> => {
     const { data, error } = await supabase
@@ -409,7 +404,7 @@ export const toggleMeditationFavoriteDB = async (userId: string, meditationId: n
     }
 }
 
-// --- POST BOOKMARKS (TWEETS) ---
+// --- POST BOOKMARKS ---
 
 export const fetchUserBookmarks = async (userId: string): Promise<Post[]> => {
     const { data, error } = await supabase

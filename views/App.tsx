@@ -26,7 +26,6 @@ import { Premeditatio } from '../modules/Premeditatio';
 import { AuthView } from './AuthView'; 
 import { DayModal } from '../components/DayModal';
 
-// --- SUB-COMPONENTE PARA TARJETAS (Mejora: Reutilización y limpieza) ---
 const SanctuaryCard = ({ id, label, sub, icon, style, onClick }: any) => (
     <button 
         onClick={() => onClick(id)} 
@@ -73,24 +72,46 @@ function SanctuaryView({
         }
     };
 
-    // --- LÓGICA DE ESTILOS PERSONALIZADA Y OPTIMIZADA (THEME AWARE) ---
-    // Now unified to always respect the active CSS variables from index.html
+    // --- COLOR LOGIC: Theme-Aware but Distinct ---
     const styles = useMemo(() => {
-        // Universal Theme-Aware Card Generator
-        // This ensures the cards ALWAYS match the active theme (whether light, dark, forest, etc.)
-        const getUnifiedCard = () => ({
-            card: `bg-[var(--card)] border border-[var(--border)] shadow-sm group hover:scale-[1.02] duration-300`,
-            icon: `text-[var(--gold)]`, // Unified accent color
-            title: `text-[var(--text-main)]`,
-            sub: `text-[var(--text-sub)] opacity-60 text-[9px] uppercase font-bold tracking-widest`,
-            box: `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)] shadow-sm`
-        });
+        const isCustomTheme = !['light', 'dark'].includes(theme);
 
-        const base = getUnifiedCard();
+        // Helper to build card classes
+        const getCardClasses = (bgClass: string, textClass: string, subClass: string, boxClass: string) => {
+            if (isCustomTheme) {
+                // For custom themes (Forest, Ocean), use the theme variables to avoid clashing
+                return {
+                    card: `bg-[var(--card)] border border-[var(--border)] shadow-sm group hover:scale-[1.02] duration-300`,
+                    icon: `text-[var(--gold)]`,
+                    title: `text-[var(--text-main)]`,
+                    sub: `text-[var(--text-sub)] opacity-60 text-[9px] uppercase font-bold tracking-widest`,
+                    box: `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)] shadow-sm`
+                };
+            }
+            // For standard Light/Dark modes, use distinct colors
+            return {
+                card: `${bgClass} border border-transparent shadow-sm group hover:scale-[1.02] duration-300`,
+                icon: textClass,
+                title: textClass,
+                sub: `${subClass} text-[9px] uppercase font-bold tracking-widest opacity-70`,
+                box: `${boxClass} shadow-sm`
+            };
+        };
+
+        // Distinct Palette Mapping
         return {
-            path: base, masters: base, schools: base, oracle: base,
-            library: base, works: base, arena: base, citadel: base,
-            glossary: base, stats: base, memento: base, premeditatio: base,
+            path: getCardClasses("bg-fuchsia-50 dark:bg-fuchsia-950", "text-fuchsia-900 dark:text-fuchsia-100", "text-fuchsia-700 dark:text-fuchsia-300", "bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-600 dark:text-fuchsia-300"),
+            masters: getCardClasses("bg-sky-50 dark:bg-sky-950", "text-sky-900 dark:text-sky-100", "text-sky-700 dark:text-sky-300", "bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-300"),
+            schools: getCardClasses("bg-indigo-50 dark:bg-indigo-950", "text-indigo-900 dark:text-indigo-100", "text-indigo-700 dark:text-indigo-300", "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300"),
+            oracle: getCardClasses("bg-violet-50 dark:bg-violet-950", "text-violet-900 dark:text-violet-100", "text-violet-700 dark:text-violet-300", "bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300"),
+            library: getCardClasses("bg-orange-50 dark:bg-orange-950", "text-orange-900 dark:text-orange-100", "text-orange-700 dark:text-orange-300", "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300"),
+            works: getCardClasses("bg-emerald-50 dark:bg-emerald-950", "text-emerald-900 dark:text-emerald-100", "text-emerald-700 dark:text-emerald-300", "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300"),
+            arena: getCardClasses("bg-amber-50 dark:bg-amber-950", "text-amber-900 dark:text-amber-100", "text-amber-700 dark:text-amber-300", "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300"),
+            citadel: getCardClasses("bg-slate-50 dark:bg-slate-900", "text-slate-900 dark:text-slate-100", "text-slate-600 dark:text-slate-400", "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"),
+            glossary: getCardClasses("bg-teal-50 dark:bg-teal-950", "text-teal-900 dark:text-teal-100", "text-teal-700 dark:text-teal-300", "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-300"),
+            stats: getCardClasses("bg-rose-50 dark:bg-rose-950", "text-rose-900 dark:text-rose-100", "text-rose-700 dark:text-rose-300", "bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300"),
+            memento: getCardClasses("bg-zinc-50 dark:bg-zinc-900", "text-zinc-900 dark:text-zinc-100", "text-zinc-600 dark:text-zinc-400", "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"),
+            premeditatio: getCardClasses("bg-purple-50 dark:bg-purple-950", "text-purple-900 dark:text-purple-100", "text-purple-700 dark:text-purple-300", "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"),
         };
     }, [theme]);
 
