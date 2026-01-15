@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Post, ParsedContent, ReactionType, CanvasStyle, SharedItem } from '../types';
 import { formatBodyText } from '../utils/textUtils';
+import { UserAvatar } from './Shared';
 
 // --- CONSTANTS ---
 const REACTIONS: Record<ReactionType, { icon: string, label: string, color: string, bg: string }> = {
@@ -17,25 +18,6 @@ const CANVAS_STYLES: Record<CanvasStyle, string> = {
     dawn: 'bg-gradient-to-br from-orange-100 via-rose-100 to-amber-100 text-rose-900 dark:from-orange-900 dark:via-rose-900 dark:to-amber-900 dark:text-orange-50',
     midnight: 'bg-stone-900 text-stone-200 border-none',
     paper: 'bg-[#FDFBF7] text-stone-800 border-stone-200 shadow-inner'
-};
-
-// --- SUB-COMPONENTS ---
-const Avatar = ({ name, url, size = 'md' }: { name: string, url?: string, size?: 'sm'|'md'|'lg'|'xl' }) => {
-    // Adjusted sizes for compactness
-    const s = size === 'xl' ? 'w-16 h-16 text-2xl' : size === 'lg' ? 'w-12 h-12 text-lg' : size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs';
-    const safeName = name || '?';
-    const charCode = safeName.charCodeAt(0) + (safeName.length * 2);
-    const colors = ['bg-stone-100 text-stone-600', 'bg-orange-100 text-orange-600', 'bg-amber-100 text-amber-600', 'bg-emerald-100 text-emerald-600', 'bg-sky-100 text-sky-600', 'bg-rose-100 text-rose-600'];
-    const colorClass = colors[charCode % colors.length];
-
-    if (url && url.startsWith('http')) {
-        return <img src={url} alt={name} className={`${s} rounded-full object-cover border border-[var(--border)] shadow-sm relative shrink-0 z-10 bg-[var(--card)]`} />;
-    }
-    return (
-        <div className={`${s} rounded-full flex items-center justify-center font-bold shadow-sm border border-[var(--border)] ${colorClass} dark:bg-white/5 dark:text-white/80 relative shrink-0 z-10`}>
-            {safeName[0].toUpperCase()}
-        </div>
-    );
 };
 
 const TagBadge = ({ tag }: { tag?: string }) => {
@@ -92,8 +74,6 @@ const QuoteEmbed = ({ post, onClick }: { post: Post, onClick: () => void }) => {
         </div>
     );
 };
-
-// --- MAIN CARD COMPONENT ---
 
 interface PostCardProps {
     post: Post;
@@ -166,13 +146,12 @@ export const PostCard: React.FC<PostCardProps> = ({
         setOpenMenu(false);
     }
 
-    // --- ARTICULO / ENSAYO (COMPACT LIST vs DETAIL) ---
     if (isArticle && !isDetail) {
         return (
             <div onClick={() => onSelect(post)} className="mb-3 bg-[var(--card)] p-4 sm:p-5 rounded-[24px] border border-[var(--border)] shadow-sm cursor-pointer hover:shadow-md transition-all group animate-fade-in relative">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2" onClick={(e) => {e.stopPropagation(); onViewProfile(post.user_name)}}>
-                         <Avatar name={post.user_name} url={c.authorProfile?.avatar} size="sm" />
+                         <UserAvatar name={post.user_name} avatarUrl={c.authorProfile?.avatar} size="sm" />
                          <div className="flex flex-col">
                              <span className="text-[10px] font-bold">{post.user_name}</span>
                              <span className="text-[9px] opacity-40">{dateStr}</span>
@@ -194,13 +173,12 @@ export const PostCard: React.FC<PostCardProps> = ({
         )
     }
 
-    // --- DEBATE (COMPACT LIST vs DETAIL) ---
     if (isDebate && !isDetail) {
         return (
             <div onClick={() => onSelect(post)} className="mb-3 bg-[var(--card)] p-4 rounded-[20px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all cursor-pointer group animate-fade-in relative">
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                        <Avatar name={post.user_name} url={c.authorProfile?.avatar} size="sm" />
+                        <UserAvatar name={post.user_name} avatarUrl={c.authorProfile?.avatar} size="sm" />
                         <div className="flex flex-col">
                             <span className="text-[10px] font-bold">{post.user_name}</span>
                             <span className="text-[8px] opacity-40">{dateStr}</span>
@@ -230,7 +208,6 @@ export const PostCard: React.FC<PostCardProps> = ({
         );
     }
 
-    // --- POST STANDARD (COMPACT LIST vs DETAIL) ---
     return (
         <div 
             onClick={() => !isDetail && onSelect(post)}
@@ -244,7 +221,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                 {isThreadStart && hasReply && <div className="absolute left-[16px] top-[40px] bottom-[-24px] w-[2px] bg-[var(--border)] z-0"></div>}
 
                 <div className="shrink-0 cursor-pointer pt-0.5" onClick={(e) => {e.stopPropagation(); onViewProfile(post.user_name)}}>
-                    <Avatar name={post.user_name} url={c.authorProfile?.avatar} size={isDetail && !isThreadStart ? 'md' : 'sm'} />
+                    <UserAvatar name={post.user_name} avatarUrl={c.authorProfile?.avatar} size={isDetail && !isThreadStart ? 'md' : 'sm'} />
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -297,7 +274,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                     {c.sharedItem && <SharedItemCard item={c.sharedItem} />}
                     {c.quoteOf && <QuoteEmbed post={c.quoteOf} onClick={() => onSelect(c.quoteOf!)} />}
 
-                    {/* ACTIONS BAR */}
                     <div className="flex items-center justify-between mt-3 max-w-[95%] text-[var(--text-sub)] relative">
                         <button className="flex items-center gap-1 group hover:text-sky-500 transition-colors z-10" onClick={(e) => { e.stopPropagation(); onReply(post); }}>
                             <div className="p-1.5 rounded-full group-hover:bg-sky-500/10 transition-colors"><i className="ph-bold ph-chat-circle text-base"></i></div>

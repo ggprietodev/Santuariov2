@@ -46,94 +46,79 @@
     
     <style>
         :root {
-            /* Light Theme (Estoico Puro) */
-            --bg: #FFFFFF; 
+            /* 1. Theme: Papiro (Light/Default) - Warm, readable, elegant */
+            --bg: #FAFAF9; /* Stone-50 */
             --card: #FFFFFF;
-            --text-main: #000000; 
-            --text-sub: #444444;
-            --border: #E5E5E5;
-            --highlight: #F4F4F5;
+            --text-main: #1C1917; /* Stone-900 */
+            --text-sub: #57534E; /* Stone-600 */
+            --border: #E7E5E4; /* Stone-200 */
+            --highlight: #F5F5F4; /* Stone-100 */
+            --gold: #B45309; /* Amber-700 (Darker Gold for contrast) */
+            --gold-dim: rgba(180, 83, 9, 0.1);
             
-            /* Accents */
-            --gold: #786C50; 
-            --gold-dim: rgba(120, 108, 80, 0.1);
-            
-            /* Dynamic Fonts Defaults */
+            /* Typography Defaults */
             --font-serif: 'Playfair Display', serif;
             --font-body: 'Inter', sans-serif;
             --font-text: 'Lora', serif;
             
-            /* Mood Colors (Vivid Stoic - Saturated & Alive) */
-            --mood-1: #FF8A80; /* Vivid Red (Chaos) */
-            --mood-2: #B388FF; /* Vivid Purple (Doubt) */
-            --mood-3: #4DD0E1; /* Vivid Cyan (Peace) */
-            --mood-4: #FFD740; /* Vivid Amber (Clarity) */
-            --mood-5: #69F0AE; /* Vivid Green (Areté) */
+            /* Mood Colors */
+            --mood-1: #F87171; 
+            --mood-2: #A78BFA;
+            --mood-3: #22D3EE;
+            --mood-4: #FBBF24;
+            --mood-5: #34D399;
 
-            --shadow: 0 2px 10px rgba(0,0,0,0.03);
+            --shadow: 0 2px 10px rgba(0,0,0,0.04);
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
         }
 
         [data-theme="dark"] {
-            /* Dark Theme (Obsidiana) */
-            --bg: #000000;
-            --card: #0A0A0A;
-            --text-main: #FFFFFF;
-            --text-sub: #888888;
-            --border: #222222;
-            --highlight: #161616;
-
-            --gold: #D4AF37;
-            --gold-dim: rgba(212, 175, 55, 0.15);
-            
-            /* Mood Colors Dark (Neon/Vivid Dark) */
-            --mood-1: #D32F2F; 
-            --mood-2: #7C4DFF; 
-            --mood-3: #00BCD4; 
-            --mood-4: #FFC107; 
-            --mood-5: #00C853;
-
-            --shadow: 0 10px 40px rgba(0,0,0,0.5);
+            /* 2. Theme: Obsidiana (Dark) - Deep, not pure black, sleek */
+            --bg: #09090B; /* Zinc-950 */
+            --card: #18181B; /* Zinc-900 */
+            --text-main: #E4E4E7; /* Zinc-200 */
+            --text-sub: #A1A1AA; /* Zinc-400 */
+            --border: #27272A; /* Zinc-800 */
+            --highlight: #27272A; /* Zinc-800 */
+            --gold: #FCD34D; /* Amber-300 */
+            --gold-dim: rgba(252, 211, 77, 0.15);
         }
 
         [data-theme="forest"] {
-            /* Forest Theme (Naturaleza) */
-            --bg: #F4F7F5;
+            /* 3. Theme: Bosque Profundo - Natural, mossy greens */
+            --bg: #F2F8F5; 
             --card: #FFFFFF;
-            --text-main: #14211C;
-            --text-sub: #4A5D53;
-            --border: #DDE5E0;
-            --highlight: #E6EDE9;
-            
-            --gold: #4A7A56; /* Moss Green */
-            --gold-dim: rgba(74, 122, 86, 0.15);
+            --text-main: #064E3B; /* Emerald-900 */
+            --text-sub: #376F62;
+            --border: #D1FAE5; /* Emerald-100 */
+            --highlight: #ECFDF5; /* Emerald-50 */
+            --gold: #059669; /* Emerald-600 */
+            --gold-dim: rgba(5, 150, 105, 0.15);
         }
 
         [data-theme="ocean"] {
-            /* Ocean Theme (Profundidad) */
-            --bg: #F2F6FA;
+            /* 4. Theme: Egeo - Deep sea blues and slates */
+            --bg: #F0F9FF; /* Sky-50 */
             --card: #FFFFFF;
-            --text-main: #0F172A;
-            --text-sub: #475569;
-            --border: #E2E8F0;
-            --highlight: #EBF2FA;
-            
-            --gold: #3B82F6; /* Bright Blue */
-            --gold-dim: rgba(59, 130, 246, 0.15);
+            --text-main: #0C4A6E; /* Sky-900 */
+            --text-sub: #475569; /* Slate-600 */
+            --border: #E0F2FE; /* Sky-100 */
+            --highlight: #F0F9FF;
+            --gold: #0284C7; /* Sky-600 */
+            --gold-dim: rgba(2, 132, 199, 0.15);
         }
 
         [data-theme="sunset"] {
-            /* Sunset Theme (Tierra) */
-            --bg: #FFFCF9;
+            /* 5. Theme: Terracota - Warm earth tones */
+            --bg: #FFF7ED; /* Orange-50 */
             --card: #FFFFFF;
-            --text-main: #2D1B0F;
-            --text-sub: #7D6052;
-            --border: #F0E6DE;
-            --highlight: #FAF2EB;
-            
-            --gold: #C27A4E; /* Terracotta */
-            --gold-dim: rgba(194, 122, 78, 0.15);
+            --text-main: #7C2D12; /* Orange-900 */
+            --text-sub: #9A3412; /* Orange-800 */
+            --border: #FFEDD5; /* Orange-100 */
+            --highlight: #FFF7ED;
+            --gold: #EA580C; /* Orange-600 */
+            --gold-dim: rgba(234, 88, 12, 0.15);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -143,7 +128,7 @@
             background: var(--bg); color: var(--text-main);
             margin: 0; padding: 0; width: 100vw; height: 100dvh;
             overflow: hidden; user-select: none;
-            transition: background 0.3s ease;
+            transition: background-color 0.4s ease, color 0.4s ease;
         }
 
         /* Typography Utilities */
@@ -160,6 +145,7 @@
         /* Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .isolate { isolation: isolate; }
     </style>
     <script type="module" src="/index.tsx"></script>
 <script type="importmap">

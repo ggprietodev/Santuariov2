@@ -1,7 +1,8 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { GlossaryTerm, WorkInteraction, WorkStatus, Work, Meditation, Post, Course, Module, Lesson, PhilosopherBio, Reading, PhilosophySchool, Task } from '../types';
+import { GlossaryTerm, WorkInteraction, WorkStatus, Work, Meditation, Post, Course, Module, Lesson, PhilosopherBio, Reading, PhilosophySchool, Task, PremeditatioLog } from '../types';
 import { parsePost } from '../utils/stoicData';
+import { calculateLevel } from '../utils/gamification';
 
 const SB_URL = "https://yxyukavdvtyyytwvdlha.supabase.co";
 const SB_KEY = "sb_publishable_LHy6ZCd3zJCHaO8uQKbBYw_usAbY0Aw"; 
@@ -40,6 +41,132 @@ export const updateUserBirthDate = async (date: string | null) => {
     const { error } = await supabase.from('profiles').update({ birth_date: date }).eq('id', user.id);
     return error;
 }
+
+// --- GAMIFICATION ---
+
+export const addXP = async (userId: string, amount: number) => {
+    console.log(`[XP] Iniciando transacción: Usuario ${userId} +${amount} XP`);
+    try {
+        // 1. Obtener perfil actual completo para asegurar existencia
+        const { data: profile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (fetchError) {
+            console.error("[XP] Error recuperando perfil:", fetchError);
+            return { success: false, leveledUp: false };
+        }
+
+        // 2. Calcular nuevo estado
+        const currentXP = profile?.xp || 0;
+        const newXP = currentXP + amount;
+        const levelData = calculateLevel(newXP);
+        const oldLevelData = calculateLevel(currentXP);
+
+        console.log(`[XP] Calculando: ${currentXP} -> ${newXP}. Nivel: ${oldLevelData.level} -> ${levelData.level}`);
+
+        // 3. Actualizar DB (Usando update explícito)
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+                xp: newXP, 
+                current_level: levelData.level 
+            })
+            .eq('id', userId);
+
+        if (updateError) {
+            console.error("[XP] Error crítico al actualizar BBDD:", updateError);
+            throw updateError;
+        }
+
+        console.log("[XP] Actualización BBDD exitosa");
+
+        // 4. Retornar resultado con flag de subida de nivel
+        return {
+            success: true,
+            leveledUp: levelData.level > oldLevelData.level,
+            newLevel: levelData.level,
+            newTitle: levelData.title,
+            currentXp: newXP
+        };
+
+    } catch (e) {
+        console.error("[XP] Excepción no controlada:", e);
+        return { success: false, leveledUp: false };
+    }
+};
+
+// --- PREMEDITATIO MALORUM ---
+
+export const savePremeditatio = async (entry: Omit<PremeditatioLog, 'id' | 'created_at' | 'user_id'>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return new Error("Usuario no autenticado");
+
+    const { error } = await supabase
+        .from('premeditatio_logs')
+        .insert({
+            user_id: user.id,
+            event_context: entry.event_context,
+            worst_case: entry.worst_case,
+            prevention: entry.prevention,
+            virtue_response: entry.virtue_response,
+            confidence_score: entry.confidence_score, // ADDED
+            mantra: entry.mantra, // ADDED
+            created_at: new Date().toISOString()
+        });
+    
+    return error;
+};
+
+export const fetchPremeditatioLogs = async (): Promise<PremeditatioLog[]> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+        .from('premeditatio_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data as PremeditatioLog[];
+};
+
+export const deletePremeditatioLog = async (id: string) => {
+    const { error } = await supabase
+        .from('premeditatio_logs')
+        .delete()
+        .eq('id', id);
+    return error;
+};
+
+// --- CHAT HISTORY (ORACLE) ---
+
+export const fetchChatHistory = async (userId: string) => {
+    const { data, error } = await supabase
+        .from('ai_chat_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(50); // Últimos 50 mensajes para contexto
+    
+    if (error || !data) return [];
+    return data;
+};
+
+export const saveChatMessage = async (userId: string, role: 'user' | 'model', content: string) => {
+    const { error } = await supabase
+        .from('ai_chat_history')
+        .insert({
+            user_id: userId,
+            role: role,
+            content: content,
+            created_at: new Date().toISOString()
+        });
+    return error;
+};
 
 // Glossary Helper
 export const fetchGlossaryTerm = async (term: string): Promise<GlossaryTerm | null> => {

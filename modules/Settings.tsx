@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminGenerator } from './AdminGenerator';
 import { getISO, updateUserPassword } from '../services/supabase';
 
-export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setFontTheme, fontSize, setFontSize, zenMode, toggleZen, onBack, onLogout, journal, masterSchools, masterPhilosophers }: any) {
+export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setFontTheme, fontSize, setFontSize, zenMode, toggleZen, onBack, onLogout, journal, masterSchools, masterPhilosophers, onAddXP }: any) {
     const [nameInput, setNameInput] = useState(user);
     const [showAdmin, setShowAdmin] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
@@ -300,11 +300,14 @@ export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setF
                         <div className="mb-10 bg-black text-green-400 font-mono text-[10px] p-4 rounded-xl overflow-x-auto">
                             <p className="mb-2 font-bold text-white">// DEBUG ({getISO()})</p>
                             <pre>{JSON.stringify(journal[getISO()], null, 2)}</pre>
+                            <div className="mt-4 border-t border-gray-700 pt-4">
+                                <ActionRow icon="ph-bold ph-lightning" label="Prueba XP (+50)" desc="Forzar recompensa (Check Console)" onClick={() => { if(onAddXP) onAddXP(50); else alert("Función no disponible"); }} />
+                            </div>
                         </div>
                     )}
 
                     <div className="text-center opacity-30 text-[9px] font-bold uppercase tracking-widest pb-4">
-                        Santuario v2.9.5 • Stoic OS
+                        Santuario v2.9.6 • Stoic OS
                     </div>
                 </div>
              </div>

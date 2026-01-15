@@ -9,7 +9,9 @@ export interface UserProfile {
     avatar: string;
     banner: string;
     website?: string;
-    birth_date?: string; // NEW: Memento Mori
+    birth_date?: string; 
+    xp?: number; // NEW: Gamification
+    current_level?: number; // NEW: Gamification
     joinedAt?: string;
 }
 
@@ -17,12 +19,24 @@ export interface JournalEntry {
     text: string;
     question_response?: string;
     challenge_response?: string;
-    challenge_title?: string; // NEW: Persist title
+    challenge_title?: string;
     challenge_completed?: boolean;
-    challenge_status?: 'success' | 'failed'; // NEW: Persist explicit status
+    challenge_status?: 'success' | 'failed';
     mood: number;
     read?: boolean;
     updated_at?: string;
+}
+
+export interface PremeditatioLog {
+    id?: string;
+    user_id?: string;
+    created_at?: string;
+    event_context: string;
+    worst_case: string;
+    prevention: string;
+    virtue_response: string;
+    confidence_score?: number; // Added
+    mantra?: string; // Added
 }
 
 export interface Reading {
@@ -77,7 +91,7 @@ export interface PhilosopherBio {
     dates: string;
     role: string;
     school: string;
-    branch?: string; // NEW: Subcategory (e.g. Madhyamaka, Late Stoa)
+    branch?: string; 
     desc: string;
     key_ideas: string[];
     icon: string;
@@ -99,10 +113,10 @@ export interface Meditation {
     id?: number;
     title: string;
     description: string;
-    category: string; // Ej: "Zen", "Estoicismo"
-    difficulty?: 'beginner' | 'advanced'; // NEW field for DB persistence
+    category: string; 
+    difficulty?: 'beginner' | 'advanced'; 
     duration_minutes: number;
-    content: string; // Guion paso a paso separado por saltos de línea
+    content: string; 
     created_at?: string;
 }
 
@@ -166,7 +180,7 @@ export interface LearningReflection {
     questionId: string;
     answer: string;
     date: string;
-    question?: string; // Helper for display
+    question?: string; 
 }
 
 export interface LessonProgress {

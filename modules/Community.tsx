@@ -6,6 +6,7 @@ import { parsePost } from '../utils/stoicData';
 import { PostCard } from '../components/PostCard';
 import { Composer } from '../components/Composer';
 import { ProfileView } from '../components/ProfileView';
+import { LevelBadge } from '../components/LevelBadge'; // IMPORTAR BADGE
 
 interface CommunityHubProps {
     user: string;
@@ -23,6 +24,8 @@ interface CommunityHubProps {
     onNavigateToProfile: (username: string) => void;
     journal?: Record<string, JournalEntry>;
     dailyTopic: string;
+    userProfile?: UserProfile | null; // Añadido
+    onAddXP?: (amount: number) => void; // NEW: XP Reward
 }
 
 const DEBATE_CATEGORIES = ["Todo", "Ética", "Lógica", "Física", "Política", "Cotidiano"];
@@ -44,7 +47,9 @@ export function CommunityHub({
     onOpenSettings,
     onNavigateToProfile,
     journal,
-    dailyTopic
+    dailyTopic,
+    userProfile,
+    onAddXP
 }: CommunityHubProps) {
     // --- ESTADOS ---
     const [subView, setSubView] = useState<'feed' | 'essays' | 'debates' | 'mine' | 'bookmarks'>('feed');
@@ -191,14 +196,13 @@ export function CommunityHub({
         setMyProfile(p);
         const {data: {user: authUser}} = await supabase.auth.getUser();
         if(authUser) {
-            await supabase.from('profiles').upsert({
-                id: authUser.id,
-                username: authUser.user_metadata.display_name || authUser.email, 
+            // Use update instead of upsert to protect XP fields from being nulled
+            await supabase.from('profiles').update({
                 bio: p.bio,
                 avatar: p.avatar,
                 banner: p.banner,
                 website: p.website
-            });
+            }).eq('id', authUser.id);
         }
     };
 
@@ -235,6 +239,8 @@ export function CommunityHub({
         });
 
         if (!error) {
+            // REWARD: Low XP for posting (2 XP)
+            if (onAddXP) await onAddXP(2); 
             setQuotingPost(null);
             setSharedItem(null); 
             await fetchPosts();
@@ -293,7 +299,11 @@ export function CommunityHub({
             content: contentPayload
         });
 
-        if (!error) await fetchReplies();
+        if (!error) {
+            // REWARD: Very Low XP for reply (1 XP)
+            if (onAddXP) await onAddXP(1); 
+            await fetchReplies();
+        }
         else alert("Error al responder: " + error.message);
     };
 
@@ -489,10 +499,17 @@ export function CommunityHub({
                         <div className="flex px-6 pt-5 pb-3 items-center justify-between">
                              <h2 className="serif text-3xl font-bold tracking-tight">Ágora</h2>
                              <div className="flex items-center gap-3">
-                                <button onClick={() => handleViewProfile(user)} className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center text-[var(--text-sub)] hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden border border-[var(--border)]">
-                                    {myProfile.avatar ? <img src={myProfile.avatar} className="w-full h-full object-cover"/> : <i className="ph-bold ph-user"></i>}
+                                {/* Level Badge Here */}
+                                <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
+                                
+                                <button onClick={() => handleViewProfile(user)} className="w-9 h-9 rounded-full bg-[var(--highlight)] flex items-center justify-center text-[var(--text-sub)] hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden border border-[var(--border)]">
+                                    {myProfile.avatar && !myProfile.avatar.startsWith('ph-') ? (
+                                        <img src={myProfile.avatar} className="w-full h-full object-cover"/>
+                                    ) : (
+                                        <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
+                                    )}
                                 </button>
-                                <button onClick={() => { if(onOpenSettings) onOpenSettings(); }} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
+                                <button onClick={() => { if(onOpenSettings) onOpenSettings(); }} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
                                     <i className="ph-bold ph-gear"></i>
                                 </button>
                              </div>
@@ -853,7 +870,7 @@ export function CommunityHub({
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-[var(--bg)] border-t border-[var(--border)] z-20">
                 <div className="max-w-3xl mx-auto flex gap-3 items-end">
                     <div className="shrink-0 mb-2 w-10 h-10 rounded-full bg-stone-200 overflow-hidden border border-[var(--border)]">
-                        {myProfile.avatar ? <img src={myProfile.avatar} className="w-full h-full object-cover" alt="me" /> : <div className="w-full h-full flex items-center justify-center font-bold text-xs">{user && user[0] ? user[0].toUpperCase() : 'U'}</div>}
+                        {myProfile.avatar && !myProfile.avatar.startsWith('ph-') ? <img src={myProfile.avatar} className="w-full h-full object-cover" alt="me" /> : <div className="w-full h-full flex items-center justify-center font-bold text-xs">{user && user[0] ? user[0].toUpperCase() : 'U'}</div>}
                     </div>
                     <div className="flex-1 flex gap-2 bg-[var(--highlight)] p-2 rounded-[28px] focus-within:ring-2 ring-[var(--border)] transition-all">
                         <textarea 

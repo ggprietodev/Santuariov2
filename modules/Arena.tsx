@@ -13,9 +13,10 @@ interface ArenaModuleProps {
     tasks: Task[];
     dichotomies: DichotomyScenario[];
     dailyTask: Task;
+    onAddXP?: (amount: number) => void; // New Prop
 }
 
-export function ArenaModule({ journal, onUpdateEntry, onBack, activeChallenge, onShare, tasks, dichotomies, dailyTask }: ArenaModuleProps) {
+export function ArenaModule({ journal, onUpdateEntry, onBack, activeChallenge, onShare, tasks, dichotomies, dailyTask, onAddXP }: ArenaModuleProps) {
     const [tab, setTab] = useState<'current' | 'history' | 'training' | 'library'>('current');
     
     // No static fallback, rely on DB data
@@ -127,6 +128,11 @@ export function ArenaModule({ journal, onUpdateEntry, onBack, activeChallenge, o
             challenge_status: resultStatus,
             challenge_title: displayTask.t 
         });
+
+        // REWARD: Low XP for completion (5 XP)
+        if (resultStatus === 'success' && onAddXP) {
+            onAddXP(5);
+        }
     };
 
     const handleShareChallenge = () => {
@@ -166,6 +172,10 @@ export function ArenaModule({ journal, onUpdateEntry, onBack, activeChallenge, o
             setFeedback('correct');
             setScore(s => s + 10);
             setStreak(s => s + 1);
+            // BONUS: Every 10 correct = 2 XP
+            if (streak > 0 && streak % 10 === 0 && onAddXP) { 
+                onAddXP(2);
+            }
             setTimeout(nextScenario, 600);
         } else {
             setFeedback('wrong');

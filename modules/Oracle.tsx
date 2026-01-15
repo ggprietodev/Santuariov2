@@ -1,7 +1,7 @@
 
-import React, { useState, useRef } from 'react';
-import { generateWisdom } from '../services/geminiService';
-import { supabase } from '../services/supabase';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { chatWithOracle } from '../services/geminiService';
+import { supabase, fetchChatHistory, saveChatMessage } from '../services/supabase';
 import { Reading, SharedItem, PhilosopherBio, PhilosophySchool } from '../types';
 
 interface OracleProps {
@@ -13,139 +13,134 @@ interface OracleProps {
     schools?: PhilosophySchool[]; 
 }
 
-export function OracleModule({ toggleSave, savedReadings, onBack, onShare, philosophers = [], schools = [] }: OracleProps) {
-    const [topic, setTopic] = useState("");
-    const [contextMode, setContextMode] = useState<'universal' | 'master' | 'school'>('universal');
-    const [selectedGuideId, setSelectedGuideId] = useState<string>("universal"); 
-    const [customGuideName, setCustomGuideName] = useState("");
-    const [genResult, setGenResult] = useState<Reading | null>(null);
+interface ChatMessage {
+    id?: string;
+    role: 'user' | 'model';
+    content: string;
+}
+
+const COMMON_TOPICS = ["Ansiedad", "Muerte", "Amor", "Propósito", "Ira", "Soledad", "Fracaso", "Éxito", "Dinero", "Tiempo"];
+
+export function OracleModule({ onBack, toggleSave, savedReadings, philosophers = [], schools = [] }: OracleProps) {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
-    const [isSavingToDb, setIsSavingToDb] = useState(false);
     
-    // Scroll ref
-    const guidesRef = useRef<HTMLDivElement>(null);
+    // Configuration State
+    const [showConfig, setShowConfig] = useState(false);
+    const [selectedSchool, setSelectedSchool] = useState<string>("General");
+    const [selectedPhilosopher, setSelectedPhilosopher] = useState<string>("Cualquiera");
+    const [topicInput, setTopicInput] = useState("");
 
-    // Dynamic Lists based on Mode
-    const featuredIds = ['maurelio', 'seneca', 'epicteto', 'nietzsche', 'buda', 'laotse', 'confucius', 'musashi'];
-    
-    const mastersList = [
-        ...philosophers.filter(p => featuredIds.includes(p.id)).map(p => ({ id: p.id, name: p.name.split(' ')[0], icon: p.icon })),
-        ...philosophers.filter(p => !featuredIds.includes(p.id)).map(p => ({ id: p.id, name: p.name.split(' ')[0], icon: p.icon })),
-        { id: 'custom', name: 'Otro', icon: 'ph-user-focus' }
-    ];
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-    // Safely map schools from DB. 
-    // IMPORTANT: Fallback to empty array if no schools passed, to prevent showing fake data.
-    const schoolsList = schools?.map(s => ({ 
-        id: s.name, 
-        name: s.name, 
-        icon: s.icon || "ph-columns" 
-    })) || [];
-
-    const currentList = contextMode === 'master' ? mastersList : contextMode === 'school' ? schoolsList : [];
-
-    const handleGenerate = async () => {
-        setLoading(true);
-        const effectiveTopic = topic.trim() || "Una lección filosófica aleatoria y profunda para mi vida hoy";
-        
-        let authorContext = undefined;
-        
-        if (contextMode === 'master') {
-            if (selectedGuideId === 'custom') {
-                if (customGuideName.trim()) authorContext = customGuideName;
-            } else {
-                const guide = philosophers.find(p => p.id === selectedGuideId);
-                if (guide) authorContext = guide.name;
+    useEffect(() => {
+        const loadHistory = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const history = await fetchChatHistory(user.id);
+                const uiMessages: ChatMessage[] = history.map((h: any) => ({
+                    id: h.id,
+                    role: h.role,
+                    content: h.content
+                }));
+                setMessages(uiMessages);
+                
+                if (uiMessages.length === 0) {
+                    setMessages([{ role: 'model', content: "Soy el Oráculo Estoico. Pregúntame sobre lo que te inquieta, y examinaremos juntos qué está bajo tu control." }]);
+                }
             }
-        } else if (contextMode === 'school') {
-             // Pass school name as "author" context to Gemini
-             authorContext = selectedGuideId;
-        }
-
-        try {
-            const res = await generateWisdom(effectiveTopic, authorContext);
-            if(res) {
-                const completeReading: Reading = {
-                    ...res,
-                    type: 'reflexion',
-                    id: res.id || `oracle-${Date.now()}`
-                };
-                setGenResult(completeReading);
-            }
-        } catch (e) {
-            console.error("Oracle generation failed:", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSaveReading = async () => {
-        if (!genResult) return;
-        setIsSavingToDb(true);
-
-        try {
-            const { data, error } = await supabase.from('content_readings').upsert({
-                title: genResult.t,
-                quote: genResult.q,
-                body: genResult.b,
-                author: genResult.a,
-                tags: genResult.k,
-                philosophy: genResult.philosophy,
-                type: 'reflexion',
-                created_at: new Date().toISOString()
-            }, { onConflict: 'quote' }).select().single();
-
-            if (error) console.error("Error saving to DB:", error);
-
-            const readingToSave = data ? { ...genResult, id: data.id } : genResult;
-            toggleSave(readingToSave);
-
-        } catch (e) {
-            console.error(e);
-            toggleSave(genResult);
-        } finally {
-            setIsSavingToDb(false);
-        }
-    };
-
-    const isSaved = (r: Reading) => savedReadings.some(saved => saved.t === r.t || saved.q === r.q);
-
-    const handleShare = () => {
-        if (genResult && onShare) {
-            onShare({
-                type: 'reading',
-                title: genResult.t,
-                content: genResult.q,
-                subtitle: genResult.a,
-                extra: 'Revelación del Oráculo',
-                data: genResult
-            });
-        }
-    };
-
-    // Helper to render icon safely
-    const renderIcon = (iconStr: string) => {
-        if (!iconStr) return <i className="ph-fill ph-sparkle"></i>;
-        let clean = iconStr.trim().replace(/^ph-/, '').replace(/^ph /, '').replace(/^Ph/, '');
-        clean = clean.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(); 
-        const map: Record<string, string> = {
-            'flower-lotus': 'lotus', 'mountain': 'mountains', 'lazi': 'wind', 'confucius': 'scroll', 'buda': 'lotus', 'balance': 'scales', 'temple': 'bank'
         };
-        if (map[clean]) clean = map[clean];
-        return <i className={`ph-fill ph-${clean}`}></i>; 
+        loadHistory();
+    }, []);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const handleSend = async (overrideText?: string) => {
+        const textToSend = overrideText || input;
+        if (!textToSend.trim() || loading) return;
+        
+        setInput("");
+        setLoading(true);
+        setShowConfig(false); 
+
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        // 1. Optimistic UI update
+        const newMessages = [...messages, { role: 'user' as const, content: textToSend }];
+        setMessages(newMessages);
+
+        // 2. Save user message
+        if (user) await saveChatMessage(user.id, 'user', textToSend);
+
+        // 3. Call AI with history context
+        const responseText = await chatWithOracle(textToSend, newMessages.slice(-10));
+
+        // 4. Update UI with AI response
+        setMessages(prev => [...prev, { role: 'model', content: responseText }]);
+        setLoading(false);
+
+        // 5. Save AI message
+        if (user) await saveChatMessage(user.id, 'model', responseText);
     };
 
-    const scrollGuides = (direction: 'left' | 'right') => {
-        if (guidesRef.current) {
-            const scrollAmount = 150;
-            guidesRef.current.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            });
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
         }
     };
 
-    const SUGGESTED_TOPICS = ["Ansiedad", "Ira", "Muerte", "Amor", "Disciplina", "Ego", "Soledad", "Caos"];
+    const handleConsult = () => {
+        if (!topicInput.trim()) return;
+        
+        let prompt = `Busco consejo sobre: "${topicInput}".`;
+        if (selectedPhilosopher !== "Cualquiera") {
+            prompt += ` Invoco la sabiduría de ${selectedPhilosopher}.`;
+        }
+        if (selectedSchool !== "General" && selectedSchool !== "Todas") {
+            prompt += ` Analízalo desde la perspectiva de la escuela: ${selectedSchool}.`;
+        }
+        
+        handleSend(prompt);
+        setTopicInput("");
+    };
+
+    const handleSaveResponse = (msg: ChatMessage, index: number) => {
+        // Find the preceding user message to use as Title/Context
+        let question = "Consulta al Oráculo";
+        if (index > 0 && messages[index - 1].role === 'user') {
+            question = messages[index - 1].content;
+        }
+
+        const readingPayload: Reading = {
+            t: question, // Title is the question
+            q: msg.content, // Quote is the answer
+            b: `Respuesta del Oráculo (${selectedSchool !== 'General' ? selectedSchool : 'Estoicismo'})`,
+            a: selectedPhilosopher !== 'Cualquiera' ? selectedPhilosopher : 'Oráculo Digital',
+            philosophy: selectedSchool !== 'General' ? selectedSchool : 'Estoicismo',
+            type: 'oracle' as any, // Special type for filtering
+            k: ['Oráculo', 'Consejo']
+        };
+
+        toggleSave(readingPayload);
+    };
+
+    // Check if a specific message content is already saved
+    const isMessageSaved = (content: string) => {
+        return savedReadings.some(r => r.q === content);
+    };
+
+    // Filter philosophers based on selected school
+    const availablePhilosophers = useMemo(() => {
+        if (selectedSchool === "General" || selectedSchool === "Todas") return philosophers;
+        return philosophers.filter(p => p.school === selectedSchool);
+    }, [selectedSchool, philosophers]);
 
     return (
         <div className="flex flex-col h-full animate-fade-in bg-[var(--bg)] items-center relative overflow-hidden">
@@ -154,176 +149,142 @@ export function OracleModule({ toggleSave, savedReadings, onBack, onShare, philo
             <div className="w-full max-w-2xl flex items-center justify-between px-6 py-4 sticky top-0 z-30 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)]">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center shadow-sm active:scale-95 transition-transform border border-[var(--border)]"><i className="ph-bold ph-arrow-left"></i></button>
-                    <h2 className="serif text-2xl font-bold">Oráculo</h2>
+                    <div>
+                        <h2 className="serif text-2xl font-bold">El Oráculo</h2>
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Mentor Estoico</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={() => setShowConfig(!showConfig)} 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition-all ${showConfig ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--card)] border-[var(--border)] text-[var(--text-sub)] hover:bg-[var(--highlight)]'}`}
+                >
+                    <i className="ph-bold ph-sliders-horizontal"></i>
+                </button>
+            </div>
+
+            {/* Config Panel (Collapsible) */}
+            <div className={`w-full max-w-2xl bg-[var(--card)] border-b border-[var(--border)] overflow-hidden transition-all duration-300 ease-in-out shadow-sm relative z-20 ${showConfig ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="p-6 space-y-5">
+                    
+                    {/* Schools */}
+                    <div>
+                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block">Escuela</span>
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                            <button onClick={() => { setSelectedSchool("General"); setSelectedPhilosopher("Cualquiera"); }} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${selectedSchool==="General" ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--bg)] border-[var(--border)]'}`}>General</button>
+                            {schools.map(s => (
+                                <button key={s.name} onClick={() => { setSelectedSchool(s.name); setSelectedPhilosopher("Cualquiera"); }} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${selectedSchool===s.name ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--bg)] border-[var(--border)]'}`}>
+                                    {s.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Philosophers */}
+                    <div>
+                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block">Guía Específico</span>
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                            <button onClick={() => setSelectedPhilosopher("Cualquiera")} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${selectedPhilosopher==="Cualquiera" ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--bg)] border-[var(--border)]'}`}>Cualquiera</button>
+                            {availablePhilosophers.map(p => (
+                                <button key={p.id} onClick={() => setSelectedPhilosopher(p.name)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${selectedPhilosopher===p.name ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--bg)] border-[var(--border)]'}`}>
+                                    {p.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Topic */}
+                    <div>
+                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-2 block">Tema de Consulta</span>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {COMMON_TOPICS.map(t => (
+                                <button key={t} onClick={() => setTopicInput(t)} className={`px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest border transition-all ${topicInput === t ? 'bg-[var(--highlight)] border-[var(--text-main)]' : 'bg-[var(--bg)] border-[var(--border)] opacity-60 hover:opacity-100'}`}>
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <input 
+                                value={topicInput} 
+                                onChange={(e) => setTopicInput(e.target.value)} 
+                                placeholder="O escribe tu inquietud..." 
+                                className="flex-1 bg-[var(--highlight)] p-3 rounded-xl text-sm font-serif outline-none border border-transparent focus:border-[var(--text-main)]"
+                            />
+                            <button onClick={handleConsult} disabled={!topicInput.trim()} className="bg-[var(--text-main)] text-[var(--bg)] px-4 rounded-xl shadow-md disabled:opacity-50 active:scale-95 transition-all">
+                                <i className="ph-bold ph-paper-plane-right text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div className="w-full max-w-2xl flex-1 overflow-y-auto px-6 pb-32 no-scrollbar pt-6 relative z-10 flex flex-col">
-                
-                {!genResult ? (
-                    <div className="flex flex-col animate-fade-in">
-                         
-                         {/* Mode Selector */}
-                         <div className="flex bg-[var(--card)] p-1 rounded-2xl border border-[var(--border)] mb-6 shadow-sm">
-                             <button onClick={() => { setContextMode('universal'); setSelectedGuideId('universal'); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${contextMode==='universal' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-md' : 'text-[var(--text-sub)] hover:bg-[var(--highlight)]'}`}>Universal</button>
-                             <button onClick={() => { setContextMode('master'); setSelectedGuideId(mastersList[0]?.id || 'universal'); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${contextMode==='master' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-md' : 'text-[var(--text-sub)] hover:bg-[var(--highlight)]'}`}>Maestros</button>
-                             <button onClick={() => { setContextMode('school'); setSelectedGuideId(schoolsList[0]?.id || 'universal'); }} className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${contextMode==='school' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-md' : 'text-[var(--text-sub)] hover:bg-[var(--highlight)]'}`}>Corrientes</button>
-                         </div>
+            {/* Chat Body */}
+            <div className="w-full max-w-2xl flex-1 overflow-y-auto px-4 pb-4 pt-6 relative z-10 flex flex-col no-scrollbar" ref={scrollRef}>
+                <div className="space-y-6 pb-20">
+                    {messages.map((msg, i) => {
+                        const isUser = msg.role === 'user';
+                        const isSaved = !isUser && isMessageSaved(msg.content);
 
-                         {/* Guide Selector Area (Only for Master/School) */}
-                         {contextMode !== 'universal' && (
-                             <div className="mb-8 relative group">
-                                 <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 ml-1 text-center">
-                                     {contextMode === 'master' ? 'Selecciona un Guía' : 'Selecciona una Escuela'}
-                                 </h4>
-                                 
-                                 <div className="relative">
-                                     <button onClick={() => scrollGuides('left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-[var(--card)] border border-[var(--border)] shadow-md flex items-center justify-center text-[var(--text-main)] -ml-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0 hidden sm:flex">
-                                         <i className="ph-bold ph-caret-left"></i>
-                                     </button>
-
-                                     <div ref={guidesRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-6 px-1 snap-x snap-mandatory w-full scroll-smooth">
-                                        {currentList.length === 0 && (
-                                            <div className="w-full text-center py-4 opacity-40 text-xs italic bg-[var(--highlight)] rounded-xl border border-[var(--border)]">
-                                                No se encontraron registros. <br/> 
-                                                <span className="text-[9px] opacity-60">Revisa la conexión o genera contenido en Ajustes.</span>
-                                            </div>
-                                        )}
-                                        {currentList.map(guide => (
-                                            <button 
-                                                key={guide.id}
-                                                onClick={() => setSelectedGuideId(guide.id)}
-                                                className={`flex flex-col items-center gap-2 min-w-[72px] group/item transition-all duration-300 snap-center shrink-0 ${selectedGuideId === guide.id ? 'opacity-100 scale-105' : 'opacity-50 hover:opacity-80'}`}
-                                            >
-                                                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-sm border-2 transition-all ${selectedGuideId === guide.id ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)] shadow-md' : 'bg-[var(--card)] border-[var(--border)] text-[var(--text-main)]'}`}>
-                                                    {renderIcon(guide.icon)}
-                                                </div>
-                                                <span className="text-[9px] font-bold uppercase tracking-wider truncate w-full text-center max-w-[80px]">{guide.name}</span>
-                                            </button>
-                                        ))}
-                                        <div className="min-w-[20px] shrink-0"></div>
-                                     </div>
-
-                                     <button onClick={() => scrollGuides('right')} className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-[var(--card)] border border-[var(--border)] shadow-md flex items-center justify-center text-[var(--text-main)] -mr-2 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex">
-                                         <i className="ph-bold ph-caret-right"></i>
-                                     </button>
-                                 </div>
-
-                                 {/* Custom Guide Input */}
-                                 <div className={`transition-all duration-300 overflow-hidden ${selectedGuideId === 'custom' ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-                                    <div className="bg-[var(--card)] p-3 rounded-2xl border border-[var(--border)] flex items-center gap-3">
-                                        <i className="ph-bold ph-user-pen opacity-40 ml-1"></i>
-                                        <input 
-                                            value={customGuideName}
-                                            onChange={(e) => setCustomGuideName(e.target.value)}
-                                            placeholder="Nombre del filósofo o guía..."
-                                            className="bg-transparent w-full text-sm outline-none font-serif placeholder:font-sans placeholder:opacity-40"
-                                            autoFocus={selectedGuideId === 'custom'}
-                                        />
-                                    </div>
-                                 </div>
-                             </div>
-                         )}
-
-                         {/* Topic Input */}
-                         <div className="mb-12">
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 ml-1 text-center">Tu Inquietud</h4>
-                            <div className="bg-[var(--card)] p-6 rounded-[32px] border border-[var(--border)] shadow-sm">
-                                <input 
-                                    value={topic} 
-                                    onChange={e=>setTopic(e.target.value)} 
-                                    placeholder="¿Qué perturba tu paz?" 
-                                    className="w-full bg-transparent border-b border-[var(--border)] pb-3 outline-none font-serif text-xl placeholder:opacity-30 focus:border-[var(--text-main)] transition-colors mb-6 text-center"
-                                />
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    {SUGGESTED_TOPICS.map(t => (
-                                        <button key={t} onClick={() => setTopic(t)} className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${topic === t ? 'bg-[var(--text-main)] text-[var(--bg)] border-[var(--text-main)]' : 'bg-[var(--highlight)] border-transparent text-[var(--text-sub)] hover:border-[var(--border)]'}`}>
-                                            {t}
+                        return (
+                            <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-slide-up group`}>
+                                <div className={`max-w-[85%] rounded-[24px] px-6 py-4 relative shadow-sm ${isUser ? 'bg-[var(--text-main)] text-[var(--bg)] rounded-br-sm' : 'bg-[var(--card)] border border-[var(--border)] rounded-bl-sm text-[var(--text-main)]'}`}>
+                                    {!isUser && (
+                                        <div className="absolute -left-3 -top-3 w-8 h-8 rounded-full bg-indigo-950 border border-indigo-800 flex items-center justify-center shadow-md z-10">
+                                            <i className="ph-fill ph-sparkle text-indigo-400 text-sm animate-pulse-slow"></i>
+                                        </div>
+                                    )}
+                                    <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isUser ? 'font-sans' : 'serif-text opacity-90'}`}>
+                                        {msg.content}
+                                    </p>
+                                    
+                                    {/* Bookmark Action for AI Messages */}
+                                    {!isUser && (
+                                        <button 
+                                            onClick={() => handleSaveResponse(msg, i)}
+                                            className={`absolute -bottom-3 -right-3 w-8 h-8 rounded-full border shadow-sm flex items-center justify-center transition-all active:scale-90 ${isSaved ? 'bg-[var(--gold)] border-[var(--gold)] text-white' : 'bg-[var(--card)] border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--gold)]'}`}
+                                            title="Guardar en Biblioteca"
+                                        >
+                                            <i className={`ph-${isSaved ? 'fill' : 'bold'} ph-bookmark-simple text-sm`}></i>
                                         </button>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
-                         </div>
+                        );
+                    })}
+                    {loading && (
+                        <div className="flex justify-start animate-fade-in">
+                            <div className="bg-[var(--card)] border border-[var(--border)] rounded-[24px] rounded-bl-sm px-6 py-4 flex items-center gap-2">
+                                <div className="w-2 h-2 bg-[var(--text-sub)] rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+                                <div className="w-2 h-2 bg-[var(--text-sub)] rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                                <div className="w-2 h-2 bg-[var(--text-sub)] rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-                         {/* Stylized Action Button */}
-                         <div className="flex justify-center">
-                             <button 
-                                onClick={handleGenerate} 
-                                disabled={loading}
-                                className="group relative px-10 py-4 bg-[var(--text-main)] text-[var(--bg)] rounded-full font-bold uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all hover:scale-105 disabled:opacity-70 disabled:hover:scale-100 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                                <div className="flex items-center gap-3 relative z-10">
-                                    {loading ? <i className="ph-duotone ph-spinner animate-spin text-lg"></i> : <i className="ph-bold ph-sparkle text-lg"></i>}
-                                    <span>{loading ? "Consultando..." : "Revelar Sabiduría"}</span>
-                                </div>
-                            </button>
-                         </div>
+            {/* Input Area */}
+            <div className="w-full max-w-2xl px-4 pb-6 pt-2 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)] to-transparent z-20">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-[32px] p-2 flex items-center gap-2 shadow-lg focus-within:border-[var(--text-main)] transition-colors">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--text-sub)] opacity-50 shrink-0">
+                        <i className="ph-bold ph-chats-teardrop text-xl"></i>
                     </div>
-                ) : (
-                    <div className="animate-fade-in w-full max-w-md mx-auto pt-4">
-                        {/* Result Card - Standard Clean Style */}
-                        <div className="bg-[var(--card)] p-8 rounded-[32px] border border-[var(--border)] shadow-lg relative overflow-hidden mb-8 group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--highlight)] rounded-bl-[100px] opacity-50 -mr-10 -mt-10 pointer-events-none"></div>
-                            
-                            <div className="mb-8 flex items-center justify-between relative z-10">
-                                <span className="text-[10px] font-bold uppercase tracking-[3px] opacity-40 bg-[var(--highlight)] px-3 py-1 rounded-full border border-[var(--border)]">
-                                    {genResult.philosophy || 'Sabiduría'}
-                                </span>
-                                <div className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)]">
-                                    <i className="ph-fill ph-quotes text-lg"></i>
-                                </div>
-                            </div>
-
-                            <h3 className="serif text-2xl font-bold mb-6 text-[var(--text-main)] leading-tight relative z-10">
-                                {genResult.t}
-                            </h3>
-
-                            <div className="mb-8 relative pl-6 border-l-2 border-[var(--gold)]/50">
-                                <p className="serif-text text-xl leading-relaxed text-[var(--text-main)] italic opacity-90">
-                                    "{genResult.q}"
-                                </p>
-                            </div>
-
-                            <p className="serif-text text-sm opacity-80 leading-loose whitespace-pre-wrap mb-8">
-                                {genResult.b}
-                            </p>
-
-                            <div className="flex items-center gap-3 pt-6 border-t border-[var(--border)]">
-                                <div className="w-8 h-8 rounded-full bg-[var(--text-main)] flex items-center justify-center text-[var(--bg)] text-xs">
-                                    <i className="ph-bold ph-pen-nib"></i>
-                                </div>
-                                <span className="text-xs font-bold uppercase tracking-widest opacity-60">{genResult.a}</span>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <button onClick={() => setGenResult(null)} className="py-4 rounded-full border border-[var(--border)] text-[var(--text-sub)] font-bold uppercase tracking-widest text-xs hover:bg-[var(--highlight)] transition-colors bg-[var(--card)]">
-                                Nueva Consulta
-                            </button>
-                            <button 
-                                onClick={handleSaveReading}
-                                disabled={isSavingToDb}
-                                className={`py-4 rounded-full font-bold uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2 shadow-sm ${isSaved(genResult) ? 'bg-[var(--gold)] text-white' : 'bg-[var(--text-main)] text-[var(--bg)]'}`}
-                            >
-                                {isSavingToDb ? (
-                                    <i className="ph-duotone ph-spinner animate-spin text-lg"></i>
-                                ) : isSaved(genResult) ? (
-                                    <><i className="ph-fill ph-bookmark-simple text-lg"></i> Guardado</>
-                                ) : (
-                                    <><i className="ph-bold ph-bookmark-simple text-lg"></i> Guardar</>
-                                )}
-                            </button>
-                        </div>
-                        
-                        <div className="flex justify-center">
-                             <button onClick={handleShare} className="text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors p-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-60 hover:opacity-100">
-                                <i className="ph-bold ph-share-network text-lg"></i> Compartir Hallazgo
-                             </button>
-                        </div>
-                    </div>
-                )}
+                    <input 
+                        ref={inputRef}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Consulta al sabio..."
+                        className="flex-1 bg-transparent outline-none font-serif text-base placeholder:font-sans placeholder:opacity-40 h-12"
+                        disabled={loading}
+                    />
+                    <button 
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || loading}
+                        className="w-12 h-12 rounded-full bg-[var(--text-main)] text-[var(--bg)] flex items-center justify-center shadow-md active:scale-95 transition-all disabled:opacity-50 hover:scale-105 shrink-0"
+                    >
+                        <i className="ph-bold ph-paper-plane-right text-lg"></i>
+                    </button>
+                </div>
             </div>
         </div>
     );

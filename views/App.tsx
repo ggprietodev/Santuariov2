@@ -1,29 +1,51 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions } from './services/supabase';
-import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction } from './types';
-import { getSyncedDailyData, parsePost } from './utils/stoicData';
-import { NavBtn } from './components/Shared';
+import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions, addXP } from '../services/supabase';
+import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction, UserProfile } from '../types';
+import { getSyncedDailyData, parsePost } from '../utils/stoicData';
+import { NavBtn, UserAvatar } from '../components/Shared';
+import { LevelBadge } from '../components/LevelBadge';
 
 // Views & Modules
-import { TodayView } from './views/Today';
-import { CalendarView } from './views/Calendar';
-import { SettingsModule } from './modules/Settings';
-import { CitadelModule } from './modules/Citadel';
-import { LibraryModule } from './modules/Library';
-import { StatsModule } from './modules/Stats';
-import { ArenaModule } from './modules/Arena';
-import { CommunityHub } from './modules/Community';
-import { LearningModule } from './modules/Learning';
-import { OracleModule } from './modules/Oracle';
-import { PhilosophersModule } from './modules/Philosophers';
-import { GlossaryModule } from './modules/Glossary';
-import { SchoolsModule } from './modules/Schools';
-import { WorksManager } from './modules/WorksManager';
-import { AuthView } from './views/AuthView'; 
-import { DayModal } from './components/DayModal';
+import { TodayView } from './Today';
+import { CalendarView } from './Calendar';
+import { SettingsModule } from '../modules/Settings';
+import { CitadelModule } from '../modules/Citadel';
+import { LibraryModule } from '../modules/Library';
+import { StatsModule } from '../modules/Stats';
+import { ArenaModule } from '../modules/Arena';
+import { CommunityHub } from '../modules/Community';
+import { LearningModule } from '../modules/Learning';
+import { OracleModule } from '../modules/Oracle';
+import { PhilosophersModule } from '../modules/Philosophers';
+import { GlossaryModule } from '../modules/Glossary';
+import { SchoolsModule } from '../modules/Schools';
+import { WorksManager } from '../modules/WorksManager';
+import { MementoMori } from '../modules/MementoMori';
+import { Premeditatio } from '../modules/Premeditatio';
+import { AuthView } from './AuthView'; 
+import { DayModal } from '../components/DayModal';
+
+// --- SUB-COMPONENTE PARA TARJETAS (Mejora: Reutilización y limpieza) ---
+const SanctuaryCard = ({ id, label, sub, icon, style, onClick }: any) => (
+    <button 
+        onClick={() => onClick(id)} 
+        className={`${style.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between text-left w-full h-full transition-all active:scale-95`}
+    >
+        <div className="flex justify-start">
+            <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${style.box}`}>
+                <i className={`${icon} text-xl`}></i>
+            </div>
+        </div>
+        <div>
+            <h3 className={`serif text-lg font-bold ${style.title}`}>{label}</h3>
+            <p className={`${style.sub}`}>{sub}</p>
+        </div>
+    </button>
+);
 
 function SanctuaryView({ 
-    user, userId, savedReadings, toggleSave, journal, sanctuaryMode, setSanctuaryMode, onBack, onUpdateEntry, 
+    user, userId, userProfile, updateUserProfile, savedReadings, toggleSave, journal, sanctuaryMode, setSanctuaryMode, onBack, onUpdateEntry, 
     learningReflections, saveLearningReflection, activeChallenge, setActiveChallenge, followedPhilosophers, 
     toggleFollowPhilosopher, dailyPhilosopher, onShare, onNavigateToProfile, onOpenSettings,
     masterReadings, masterPhilosophers, masterSchools, masterGlossary, masterModules, masterCourses, masterTasks, masterDichotomies, masterWorks, masterMeditations,
@@ -38,7 +60,8 @@ function SanctuaryView({
     userInteractions,
     onWorkInteractionUpdate,
     onPlayerToggle,
-    theme 
+    theme,
+    onAddXP 
 }: any) {
     
     const handleModuleBack = () => {
@@ -50,71 +73,41 @@ function SanctuaryView({
         }
     };
 
-    // --- LÓGICA DE ESTILOS PERSONALIZADA ---
-    const isCustomTheme = useMemo(() => !['light', 'dark'].includes(theme), [theme]);
+    // --- LÓGICA DE ESTILOS PERSONALIZADA Y OPTIMIZADA (THEME AWARE) ---
+    // Now unified to always respect the active CSS variables from index.html
+    const styles = useMemo(() => {
+        // Universal Theme-Aware Card Generator
+        // This ensures the cards ALWAYS match the active theme (whether light, dark, forest, etc.)
+        const getUnifiedCard = () => ({
+            card: `bg-[var(--card)] border border-[var(--border)] shadow-sm group hover:scale-[1.02] duration-300`,
+            icon: `text-[var(--gold)]`, // Unified accent color
+            title: `text-[var(--text-main)]`,
+            sub: `text-[var(--text-sub)] opacity-60 text-[9px] uppercase font-bold tracking-widest`,
+            box: `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)] shadow-sm`
+        });
 
-    const getCardClasses = (defaultColorBg: string, defaultBorder: string, defaultIconColor: string, defaultTitleColor: string, defaultSubColor: string, defaultBox: string) => {
-        if (isCustomTheme) {
-            // Valores por defecto para temas custom
-            let cardBg = `bg-[var(--card)]`;
-            let cardBorder = `border-[var(--border)]`;
-            let textColor = `text-[var(--text-main)]`;
-            let subColor = `text-[var(--text-sub)] opacity-60`;
-            let boxClass = `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)]`;
-
-            // Personalización profunda por tema (Tarjeta oscura + Texto claro)
-            if (theme === 'ocean') {
-                cardBg = 'bg-cyan-950';
-                cardBorder = 'border-cyan-800';
-                textColor = 'text-cyan-50';
-                subColor = 'text-cyan-200 opacity-60';
-                boxClass = 'bg-cyan-900 text-cyan-200 border border-cyan-700 shadow-inner'; 
-            } else if (theme === 'forest') {
-                cardBg = 'bg-emerald-950';
-                cardBorder = 'border-emerald-800';
-                textColor = 'text-emerald-50';
-                subColor = 'text-emerald-200 opacity-60';
-                boxClass = 'bg-emerald-900 text-emerald-200 border border-emerald-700 shadow-inner';
-            } else if (theme === 'sunset') {
-                cardBg = 'bg-orange-950';
-                cardBorder = 'border-orange-800';
-                textColor = 'text-orange-50';
-                subColor = 'text-orange-200 opacity-60';
-                boxClass = 'bg-orange-900 text-orange-200 border border-orange-700 shadow-inner';
-            }
-
-            // Diseño Monocromático / Elegante
-            return {
-                card: `${cardBg} ${cardBorder} border shadow-sm group transition-all hover:scale-[1.02] active:scale-95 duration-300 h-full`,
-                icon: `${textColor} opacity-90 transition-transform group-hover:scale-110 duration-300`,
-                title: textColor,
-                sub: `text-[9px] uppercase font-bold ${subColor}`,
-                box: `${boxClass} transition-all group-hover:scale-110 duration-300 shadow-sm`
-            };
-        }
-        
-        // Estilo Colorido Original (Día/Noche)
+        const base = getUnifiedCard();
         return {
-            card: `${defaultColorBg} ${defaultBorder} transition-all border h-full group hover:shadow-md hover:scale-[1.02] active:scale-95 duration-300`,
-            icon: `${defaultIconColor} transition-transform group-hover:scale-110 duration-300`,
-            title: defaultTitleColor,
-            sub: defaultSubColor,
-            box: `${defaultBox} transition-transform group-hover:scale-110 duration-300 shadow-sm`
+            path: base, masters: base, schools: base, oracle: base,
+            library: base, works: base, arena: base, citadel: base,
+            glossary: base, stats: base, memento: base, premeditatio: base,
         };
-    };
+    }, [theme]);
 
-    const styles = {
-        path: getCardClasses("bg-[#FAF5FF] dark:bg-[#1E1024]", "border-fuchsia-100 dark:border-fuchsia-900/20", "text-fuchsia-500", "text-fuchsia-900 dark:text-fuchsia-50", "text-fuchsia-800 dark:text-fuchsia-200", ""),
-        masters: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", ""),
-        schools: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", ""),
-        oracle: getCardClasses("bg-purple-50 dark:bg-purple-900/10", "border-purple-100 dark:border-purple-900/20", "text-purple-500/10", "text-purple-900 dark:text-purple-50", "text-purple-800 dark:text-purple-200", "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"),
-        library: getCardClasses("bg-[#FFF7ED] dark:bg-[#2C1810]", "border-orange-100 dark:border-orange-900/20", "text-orange-500/10", "text-orange-900 dark:text-orange-50", "text-orange-800 dark:text-orange-200", "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300"),
-        works: getCardClasses("bg-[#F0FDF4] dark:bg-[#052E16]", "border-emerald-100 dark:border-emerald-900/20", "text-emerald-500/10", "text-emerald-900 dark:text-emerald-50", "text-emerald-800 dark:text-emerald-200", "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300"),
-        arena: getCardClasses("bg-[#FFFBEB] dark:bg-[#2C2410]", "border-amber-100 dark:border-amber-900/20", "text-amber-500", "text-amber-900 dark:text-amber-50", "text-amber-800 dark:text-amber-200", ""),
-        citadel: getCardClasses("bg-stone-100 dark:bg-stone-900", "border-[var(--border)]", "text-[var(--text-sub)] opacity-10", "text-[var(--text-main)]", "opacity-60", "bg-[var(--text-main)] text-[var(--bg)]"),
-        glossary: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-sub)]", "text-[var(--text-main)]", "opacity-60", ""),
-        stats: getCardClasses("bg-[#Fdf4f0] dark:bg-[#2e1a16]", "border-rose-100 dark:border-rose-900/20", "text-rose-500", "text-rose-900 dark:text-rose-50", "text-rose-800 dark:text-rose-200", "")
-    };
+    const MENU_ITEMS = [
+        { id: 'path', label: 'Camino', sub: 'Cursos', icon: 'ph-duotone ph-path', style: styles.path },
+        { id: 'masters', label: 'Maestros', sub: 'Biografías', icon: 'ph-duotone ph-student', style: styles.masters },
+        { id: 'schools', label: 'Escuelas', sub: 'Tradiciones', icon: 'ph-duotone ph-columns', style: styles.schools },
+        { id: 'oracle', label: 'Oráculo', sub: 'Consultas', icon: 'ph-bold ph-sparkle', style: styles.oracle },
+        { id: 'library', label: 'Biblioteca', sub: 'Citas', icon: 'ph-bold ph-book-open', style: styles.library },
+        { id: 'works', label: 'Obras', sub: 'Libros', icon: 'ph-bold ph-read-cv-logo', style: styles.works },
+        { id: 'arena', label: 'Arena', sub: 'Reto', icon: 'ph-fill ph-sword', style: styles.arena },
+        { id: 'citadel', label: 'Ciudadela', sub: 'Meditación', icon: 'ph-bold ph-castle-turret', style: styles.citadel },
+        { id: 'glossary', label: 'Léxico', sub: 'Glosario', icon: 'ph-duotone ph-book-bookmark', style: styles.glossary },
+        { id: 'memento', label: 'Memento', sub: 'Tiempo', icon: 'ph-duotone ph-hourglass', style: styles.memento },
+        { id: 'premeditatio', label: 'Premeditatio', sub: 'Adversidad', icon: 'ph-duotone ph-skull', style: styles.premeditatio },
+        { id: 'stats', label: 'Legado', sub: 'Stats', icon: 'ph-fill ph-chart-bar', style: styles.stats },
+    ];
 
     return (
         <div className="h-full w-full relative">
@@ -125,8 +118,13 @@ function SanctuaryView({
                         <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Sabiduría Universal</p>
                     </div>
                     <div className="flex items-center gap-3">
+                         <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
                          <button onClick={() => onNavigateToProfile(user)} className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] shadow-sm hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden">
-                            <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
+                            {userProfile?.avatar && !userProfile.avatar.startsWith('ph-') ? (
+                                <img src={userProfile.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
+                            )}
                          </button>
                          <button onClick={onOpenSettings} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
                      </div>
@@ -134,133 +132,29 @@ function SanctuaryView({
 
                 <div className="w-full max-w-2xl px-6 pb-32">
                     <div className="grid grid-cols-2 gap-4 auto-rows-[160px]">
-                        {/* CAMINO */}
-                        <div onClick={() => setSanctuaryMode('path')} className={`${styles.path.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <i className={`ph-duotone ph-path text-4xl ${styles.path.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.path.title}`}>Camino</h3>
-                                <p className={`${styles.path.sub}`}>Cursos</p>
-                            </div>
-                        </div>
-
-                        {/* MAESTROS (LIMPIO) */}
-                        <div onClick={() => setSanctuaryMode('masters')} className={`${styles.masters.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <i className={`ph-duotone ph-student text-4xl ${styles.masters.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.masters.title}`}>Maestros</h3>
-                                <p className={`${styles.masters.sub}`}>Biografías</p>
-                            </div>
-                        </div>
-
-                        {/* ESCUELAS */}
-                        <div onClick={() => setSanctuaryMode('schools')} className={`${styles.schools.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                             <div className="flex justify-start">
-                                <i className={`ph-duotone ph-columns text-4xl ${styles.schools.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.schools.title}`}>Escuelas</h3>
-                                <p className={`${styles.schools.sub}`}>Tradiciones</p>
-                            </div>
-                        </div>
-
-                        {/* ORÁCULO */}
-                        <div onClick={() => setSanctuaryMode('oracle')} className={`${styles.oracle.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                             <div className="flex justify-start">
-                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.oracle.box}`}>
-                                    <i className="ph-bold ph-sparkle text-xl"></i>
-                                </div>
-                             </div>
-                             <div>
-                                <h3 className={`serif text-lg font-bold ${styles.oracle.title}`}>Oráculo</h3>
-                                <p className={`${styles.oracle.sub}`}>Consultas</p>
-                             </div>
-                        </div>
-
-                        {/* BIBLIOTECA */}
-                        <div onClick={() => setSanctuaryMode('library')} className={`${styles.library.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                             <div className="flex justify-start">
-                                 <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.library.box}`}>
-                                    <i className="ph-bold ph-book-open text-xl"></i>
-                                 </div>
-                             </div>
-                             <div>
-                                <h3 className={`serif text-lg font-bold ${styles.library.title}`}>Biblioteca</h3>
-                                <p className={`${styles.library.sub}`}>Citas</p>
-                             </div>
-                        </div>
-
-                        {/* OBRAS */}
-                        <div onClick={() => setSanctuaryMode('works')} className={`${styles.works.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.works.box}`}>
-                                    <i className="ph-bold ph-read-cv-logo text-xl"></i>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.works.title}`}>Obras</h3>
-                                <p className={`${styles.works.sub}`}>Libros</p>
-                            </div>
-                        </div>
-
-                         {/* ARENA */}
-                         <div onClick={() => setSanctuaryMode('arena')} className={`${styles.arena.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <i className={`ph-fill ph-sword text-4xl ${styles.arena.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.arena.title}`}>Arena</h3>
-                                <p className={`${styles.arena.sub}`}>Reto</p>
-                            </div>
-                        </div>
-
-                        {/* CIUDADELA */}
-                        <div onClick={() => setSanctuaryMode('citadel')} className={`${styles.citadel.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center ${styles.citadel.box}`}>
-                                    <i className="ph-bold ph-castle-turret text-xl"></i>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.citadel.title}`}>Ciudadela</h3>
-                                <p className={`${styles.citadel.sub}`}>Meditación</p>
-                            </div>
-                        </div>
-
-                        {/* GLOSARIO */}
-                        <div onClick={() => setSanctuaryMode('glossary')} className={`${styles.glossary.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <i className={`ph-duotone ph-book-bookmark text-4xl ${styles.glossary.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.glossary.title}`}>Léxico</h3>
-                                <p className={`${styles.glossary.sub}`}>Glosario</p>
-                            </div>
-                        </div>
-
-                        {/* LEGADO */}
-                        <div onClick={() => setSanctuaryMode('stats')} className={`${styles.stats.card} p-6 rounded-[32px] cursor-pointer flex flex-col justify-between`}>
-                            <div className="flex justify-start">
-                                <i className={`ph-fill ph-chart-bar text-3xl ${styles.stats.icon}`}></i>
-                            </div>
-                            <div>
-                                <h3 className={`serif text-lg font-bold ${styles.stats.title}`}>Legado</h3>
-                                <p className={`${styles.stats.sub}`}>Stats</p>
-                            </div>
-                        </div>
+                        {MENU_ITEMS.map((item) => (
+                            <SanctuaryCard 
+                                key={item.id}
+                                id={item.id}
+                                label={item.label}
+                                sub={item.sub}
+                                icon={item.icon}
+                                style={item.style}
+                                onClick={setSanctuaryMode}
+                            />
+                        ))}
                     </div>
                  </div>
             </div>
 
+            {sanctuaryMode === 'memento' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><MementoMori onBack={handleModuleBack} birthDate={userProfile?.birth_date} onUpdateDate={(d: string) => userProfile && updateUserProfile({...userProfile, birth_date: d})} /></div>}
+            {sanctuaryMode === 'premeditatio' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><Premeditatio onBack={handleModuleBack} /></div>}
             {sanctuaryMode === 'library' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><LibraryModule user={user} readings={masterReadings} savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} onShare={onShare} schools={masterSchools} philosophers={masterPhilosophers} /></div>}
-            {sanctuaryMode === 'works' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><WorksManager works={masterWorks} philosophers={masterPhilosophers} onBack={handleModuleBack} onWorkAdded={onWorkAdded} onWorkDeleted={onWorkDeleted} userInteractions={userInteractions} onInteractionUpdate={onWorkInteractionUpdate} /></div>}
+            {sanctuaryMode === 'works' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><WorksManager works={masterWorks} philosophers={masterPhilosophers} onBack={handleModuleBack} onWorkAdded={onWorkAdded} onWorkDeleted={onWorkDeleted} userInteractions={userInteractions} onInteractionUpdate={onWorkInteractionUpdate} onAddXP={onAddXP} /></div>}
             {sanctuaryMode === 'oracle' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><OracleModule savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} philosophers={masterPhilosophers} schools={masterSchools} /></div>}
             {sanctuaryMode === 'citadel' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><CitadelModule onBack={handleModuleBack} meditations={masterMeditations} initialActiveMeditation={initialActiveMeditation} onPlayerToggle={onPlayerToggle} /></div>}
             {sanctuaryMode === 'stats' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><StatsModule journal={journal} user={user} savedReadings={savedReadings} onBack={handleModuleBack} /></div>}
-            {sanctuaryMode === 'arena' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><ArenaModule journal={journal} onUpdateEntry={onUpdateEntry} onBack={handleModuleBack} activeChallenge={activeChallenge} onShare={onShare} tasks={masterTasks} dichotomies={masterDichotomies} dailyTask={dailyTask} /></div>}
+            {sanctuaryMode === 'arena' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><ArenaModule journal={journal} onUpdateEntry={onUpdateEntry} onBack={handleModuleBack} activeChallenge={activeChallenge} onShare={onShare} tasks={masterTasks} dichotomies={masterDichotomies} dailyTask={dailyTask} onAddXP={onAddXP} /></div>}
             {sanctuaryMode === 'path' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><LearningModule userId={userId} onBack={handleModuleBack} setActiveChallenge={setActiveChallenge} onNavigateToArena={() => setSanctuaryMode('arena')} modules={masterModules} courses={masterCourses} /></div>}
             {sanctuaryMode === 'masters' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><PhilosophersModule readings={masterReadings} philosophers={masterPhilosophers} works={masterWorks} savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} initialSelectedPhilosopherId={initialSelectedPhilosopherId} onNavigateToSchool={handleNavigateToSchool} /></div>}
             {sanctuaryMode === 'glossary' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><GlossaryModule onBack={handleModuleBack} terms={masterGlossary} onNavigateToSchool={handleNavigateToSchool} onNavigateToPhilosopher={handleNavigateToPhilosopher} /></div>}
@@ -272,15 +166,25 @@ function SanctuaryView({
 export default function App() {
     const [session, setSession] = useState<any>(null);
     const [username, setUsername] = useState<string>('');
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
 
     // THEME & APPEARANCE STATE
-    const [theme, setTheme] = useState<string>(() => localStorage.getItem('stoic_theme') || 'light');
+    // Initialize Theme: Check localStorage -> Check Time of Day -> Default
+    const [theme, setTheme] = useState<string>(() => {
+        const saved = localStorage.getItem('stoic_theme');
+        if (saved) return saved;
+        
+        const hour = new Date().getHours();
+        // Day: 7 AM - 8 PM (20:00). Night otherwise.
+        return (hour >= 7 && hour < 20) ? 'light' : 'dark';
+    });
+
     const [fontTheme, setFontTheme] = useState<'classic' | 'modern' | 'humanist' | 'elegant'>(() => (localStorage.getItem('stoic_font') as any) || 'classic');
     const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>(() => (localStorage.getItem('stoic_size') as any) || 'medium');
 
     const [view, setView] = useState<'today' | 'calendar' | 'community' | 'sanctuary'>('today');
-    const [sanctuaryMode, setSanctuaryMode] = useState<'menu' | 'library' | 'oracle' | 'citadel' | 'stats' | 'arena' | 'path' | 'masters' | 'glossary' | 'schools' | 'works'>('menu');
+    const [sanctuaryMode, setSanctuaryMode] = useState<'menu' | 'library' | 'oracle' | 'citadel' | 'stats' | 'arena' | 'path' | 'masters' | 'glossary' | 'schools' | 'works' | 'memento' | 'premeditatio'>('menu');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isPlayerActive, setIsPlayerActive] = useState(false);
 
@@ -449,15 +353,14 @@ export default function App() {
 
     const fetchUserProfile = async (session: any) => {
         const userId = session.user.id;
-        const { data } = await supabase.from('profiles').select('username').eq('id', userId).single();
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
         
-        if (data && data.username) {
-            setUsername(data.username);
+        if (data) {
+            setUserProfile(data);
+            if (data.username) setUsername(data.username);
         } else if (session.user.user_metadata?.display_name) {
-            // Fallback to metadata
             setUsername(session.user.user_metadata.display_name);
         } else if (session.user.email) {
-            // Fallback to email
             setUsername(session.user.email.split('@')[0]);
         } else {
             setUsername('Estudiante'); 
@@ -540,6 +443,10 @@ export default function App() {
             newSaved = savedReadings.filter(r => r.q !== reading.q);
         } else {
             newSaved = [...savedReadings, { ...reading, saved: true }];
+            // REWARD: Add XP for saving a reading
+            if (session?.user?.id) {
+                handleAddXP(10);
+            }
         }
         setSavedReadings(newSaved);
         if (session) {
@@ -595,6 +502,18 @@ export default function App() {
     const handleNavigateToChallenge = () => { setActiveChallenge({ title: dailyTask?.title || "Reto", task: dailyTask?.description || "..." }); setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('arena'); };
     const handleNavigateToPath = () => { setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('path'); }
 
+    // --- GAMIFICATION HANDLER ---
+    const handleAddXP = async (amount: number) => {
+        if (!session?.user?.id) return;
+        const result = await addXP(session.user.id, amount);
+        if (result.success && userProfile) {
+            setUserProfile(prev => prev ? ({ ...prev, xp: result.currentXp, current_level: result.newLevel }) : null);
+            if (result.leveledUp) {
+                alert(`¡Ascenso Virtuoso! Has alcanzado el rango de ${result.newTitle}.`);
+            }
+        }
+    };
+
     if (loadingAuth) return <div className="flex h-screen items-center justify-center bg-[var(--bg)]"><i className="ph-duotone ph-spinner animate-spin text-3xl"></i></div>;
     if (!session) return <AuthView onLoginSuccess={() => {}} />;
 
@@ -603,10 +522,10 @@ export default function App() {
     return (
         <div className="flex flex-col h-[100dvh] bg-[var(--bg)] text-[var(--text-main)] overflow-hidden font-sans relative transition-colors duration-500">
              <main className="flex-1 overflow-y-auto no-scrollbar pb-24">
-                {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} />}
-                {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} />}
-                {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} />}
-                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} />}
+                {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} onAddXP={handleAddXP} userProfile={userProfile} />}
+                {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} userProfile={userProfile} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} />}
+                {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} userProfile={userProfile} onAddXP={handleAddXP} />}
+                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} userProfile={userProfile} updateUserProfile={setUserProfile} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} onAddXP={handleAddXP} />}
              </main>
              
              {/* Main Navbar */}
@@ -619,7 +538,7 @@ export default function App() {
                  </div>
              </nav>
              
-             {isSettingsOpen && <SettingsModule user={username} setUser={setUsername} theme={theme} setTheme={setTheme} fontTheme={fontTheme} setFontTheme={setFontTheme} fontSize={fontSize} setFontSize={setFontSize} onBack={() => setIsSettingsOpen(false)} onLogout={handleLogout} journal={journal} masterSchools={masterSchools} masterPhilosophers={masterPhilosophers} />}
+             {isSettingsOpen && <SettingsModule user={username} setUser={setUsername} theme={theme} setTheme={setTheme} fontTheme={fontTheme} setFontTheme={setFontTheme} fontSize={fontSize} setFontSize={setFontSize} onBack={() => setIsSettingsOpen(false)} onLogout={handleLogout} journal={journal} masterSchools={masterSchools} masterPhilosophers={masterPhilosophers} onAddXP={handleAddXP} />}
              
              {profileTargetUser && (
                 <div className="fixed inset-0 z-[60] bg-[var(--bg)] animate-fade-in flex flex-col">

@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getISO, supabase } from '../services/supabase';
-import { getUserLevel } from '../utils/stoicData';
 import { JournalEntry, Reading, PhilosopherBio, SharedItem, Meditation, Lesson, Task, UserProfile, Work } from '../types';
-import { MoodIcon } from '../components/Shared';
+import { MoodIcon, UserAvatar } from '../components/Shared';
 import { expandReadingAI, generateJournalPrompt } from '../services/geminiService';
 import { DailyReviewModal } from '../components/DailyReviewModal';
+import { LevelBadge } from '../components/LevelBadge';
 
 interface TodayViewProps {
     journal: Record<string, JournalEntry>;
@@ -29,6 +29,8 @@ interface TodayViewProps {
     onShare?: (item: SharedItem) => void;
     user: string;
     currentReads?: Work[];
+    onAddXP: (amount: number) => void; 
+    userProfile: UserProfile | null;
 }
 
 export function TodayView({ 
@@ -52,7 +54,9 @@ export function TodayView({
     onNavigateToPhilosopher,
     onShare,
     user,
-    currentReads = []
+    currentReads = [],
+    onAddXP,
+    userProfile
 }: TodayViewProps) {
     const today = getISO();
     
@@ -68,8 +72,9 @@ export function TodayView({
     const [writingFont, setWritingFont] = useState<'serif' | 'mono' | 'sans'>('serif');
     const [writingTheme, setWritingTheme] = useState<'classic' | 'paper' | 'dark' | 'blue'>('classic');
     const editorRef = useRef<HTMLDivElement>(null);
-    const [avatarUrl, setAvatarUrl] = useState<string>("");
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    
+    const [hasAwardedWritingXP, setHasAwardedWritingXP] = useState(false);
 
     useEffect(() => {
         if (journal[today]) {
@@ -79,21 +84,11 @@ export function TodayView({
                      editorRef.current.innerHTML = journal[today].text || '';
                 }
             }
+            if ((journal[today].text?.length || 0) > 50) setHasAwardedWritingXP(true);
         } else {
             if (editorRef.current) editorRef.current.innerHTML = '';
         }
     }, [journal, today]);
-
-    useEffect(() => {
-        const fetchAvatar = async () => {
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            if(authUser) {
-                const { data } = await supabase.from('profiles').select('avatar').eq('id', authUser.id).single();
-                if(data && data.avatar) setAvatarUrl(data.avatar);
-            }
-        }
-        fetchAvatar();
-    }, []);
 
     // --- NEXT LESSON LOGIC ---
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
@@ -150,6 +145,14 @@ export function TodayView({
         const newEntry = { ...entry, [field]: value };
         setEntry(newEntry);
 
+        if (!hasAwardedWritingXP && (field === 'text' || field === 'question_response')) {
+            const textLength = String(value).replace(/<[^>]*>?/gm, '').length; 
+            if (textLength > 20) {
+                if(onAddXP) onAddXP(1); 
+                setHasAwardedWritingXP(true);
+            }
+        }
+
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => {
             saveToParent(newEntry);
@@ -177,6 +180,10 @@ export function TodayView({
         };
         setEntry(newEntry);
         saveToParent(newEntry);
+        
+        if (status === 'success' && onAddXP) {
+            onAddXP(3);
+        }
     }
 
     const handleShareDaily = (e: React.MouseEvent) => {
@@ -214,6 +221,7 @@ export function TodayView({
         const newContent = (entry.text || "") + adviceHtml;
         if (editorRef.current) editorRef.current.innerHTML = newContent;
         handleDataChange('text', newContent);
+        if(onAddXP) onAddXP(2);
     };
 
     const executeCommand = (command: string, value: string | undefined = undefined) => {
@@ -236,10 +244,6 @@ export function TodayView({
         mono: 'font-mono',
         sans: 'font-sans'
     };
-
-    // LEVEL CALCULATION
-    const entryCount = Object.keys(journal).length;
-    const userLevel = getUserLevel(entryCount);
 
     // ROBUST ICON RENDERER (Same as Philosophers Module)
     const renderIcon = (iconStr: string) => {
@@ -271,16 +275,10 @@ export function TodayView({
                     </p>
                  </div>
                  <div className="flex items-center gap-3">
-                     <div className="flex flex-col items-end mr-1">
-                         <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">Nivel</span>
-                         <span className={`text-[10px] font-bold ${userLevel.color}`}>{userLevel.title}</span>
-                     </div>
-                     <button onClick={onNavigateToProfile} className="w-9 h-9 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] shadow-sm hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden">
-                        {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover"/> : (
-                            <div className="text-xs font-bold">
-                                {user && user[0] ? user[0].toUpperCase() : 'E'}
-                            </div>
-                        )}
+                     <LevelBadge xp={userProfile?.xp || 0} />
+                     
+                     <button onClick={onNavigateToProfile} className="rounded-full shadow-sm hover:scale-105 transition-transform overflow-hidden">
+                        <UserAvatar name={user} avatarUrl={userProfile?.avatar} size="md" />
                      </button>
                      <button onClick={onOpenSettings} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
                  </div>

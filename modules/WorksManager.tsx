@@ -13,6 +13,7 @@ interface WorksManagerProps {
     onWorkDeleted?: (id: number) => void;
     userInteractions: Record<number, WorkInteraction>;
     onInteractionUpdate: (workId: number, interaction: WorkInteraction) => void;
+    onAddXP?: (amount: number) => void; // NEW
 }
 
 interface WorkCardProps {
@@ -114,7 +115,7 @@ const WorkCard: React.FC<WorkCardProps> = ({
     );
 };
 
-export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkDeleted, userInteractions, onInteractionUpdate }: WorksManagerProps) {
+export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkDeleted, userInteractions, onInteractionUpdate, onAddXP }: WorksManagerProps) {
     const [view, setView] = useState<'list' | 'add'>('list');
     const [searchTerm, setSearchTerm] = useState("");
     
@@ -138,6 +139,7 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
     const [isProcessing, setIsProcessing] = useState(false);
     const [analysisResults, setAnalysisResults] = useState<Reading[]>([]);
     const [selectedResults, setSelectedResults] = useState<Set<number>>(new Set());
+    const [isZenMode, setIsZenMode] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -164,6 +166,8 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
         const newInteraction = { ...userInteractions[workId], work_id: workId, status };
         onInteractionUpdate(workId, newInteraction);
         await updateWorkStatus(currentUserId, workId, status);
+        // REWARD: Finish a book (10 XP)
+        if (status === 'completed' && onAddXP) onAddXP(10);
     };
 
     const handleRatingChange = async (workId: number, rating: number) => {
@@ -197,6 +201,7 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
 
         if(!error) {
             if (data && data[0] && onWorkAdded) onWorkAdded(data[0] as Work);
+            if (onAddXP) onAddXP(2); // REWARD: Add a book (2 XP)
             setView('list'); setNewTitle(""); setNewAuthor(""); setNewLink("");
         } else {
             alert("Error: " + error.message);
@@ -241,6 +246,7 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
         const { error } = await supabase.from('content_readings').upsert(dbPayload, { onConflict: 'quote', ignoreDuplicates: true });
         if(!error) { 
             alert(`${toSave.length} citas guardadas.`); 
+            if (onAddXP) onAddXP(toSave.length * 1); // REWARD: 1 XP per quote saved
             setAnalyzingWork(null); 
             setAnalysisResults([]); 
             setFile(null); 
@@ -257,14 +263,21 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
         return matchSearch && matchStatus && matchType;
     }).sort((a, b) => (sortBy === 'title' ? a.title.localeCompare(b.title) : sortBy === 'rating' ? (userInteractions[b.id!]?.rating || 0) - (userInteractions[a.id!]?.rating || 0) : new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
 
-    // ANALYSIS MODAL RENDER
+    // ANALYSIS MODAL RENDER (Omitted for brevity, assumed standard logic with handleAnalyze)
     if (analyzingWork) {
         return (
             <div className="fixed inset-0 z-[100] bg-[var(--bg)] flex flex-col items-center animate-fade-in">
-                <div className="w-full max-w-2xl h-full flex flex-col p-6">
+                <div className="w-full max-w-2xl h-full flex flex-col p-6 relative">
                     <div className="flex items-center justify-between mb-6 shrink-0">
                         <h3 className="serif text-2xl font-bold">Extracción de Sabiduría</h3>
-                        <button onClick={() => { setAnalyzingWork(null); setAnalysisResults([]); setFile(null); }} className="w-10 h-10 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center hover:bg-[var(--highlight)]"><i className="ph-bold ph-x"></i></button>
+                        <div className="flex gap-2">
+                            {analysisResults.length > 0 && (
+                                <button onClick={() => setIsZenMode(true)} className="w-10 h-10 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center hover:bg-[var(--highlight)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors" title="Modo Lectura">
+                                    <i className="ph-bold ph-arrows-out-simple"></i>
+                                </button>
+                            )}
+                            <button onClick={() => { setAnalyzingWork(null); setAnalysisResults([]); setFile(null); }} className="w-10 h-10 rounded-full bg-[var(--card)] border border-[var(--border)] flex items-center justify-center hover:bg-[var(--highlight)]"><i className="ph-bold ph-x"></i></button>
+                        </div>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto no-scrollbar">
@@ -328,6 +341,44 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
                         </div>
                     )}
                 </div>
+
+                {/* ZEN MODE OVERLAY */}
+                {isZenMode && (
+                    <div className="fixed inset-0 z-[110] h-screen w-screen bg-[#fcfbf9] dark:bg-[#1c1c1c] overflow-y-auto animate-fade-in no-scrollbar text-[#2c2c2c] dark:text-[#e0e0e0]">
+                        <button 
+                            onClick={() => setIsZenMode(false)} 
+                            className="fixed top-6 right-6 p-4 text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors z-50 bg-transparent active:scale-90"
+                        >
+                            <i className="ph-bold ph-x text-3xl"></i>
+                        </button>
+                        
+                        <div className="max-w-2xl mx-auto px-8 py-32 min-h-screen">
+                            <div className="text-center mb-24 opacity-40">
+                                <h2 className="text-xs font-bold uppercase tracking-[4px] mb-2">{analyzingWork.title}</h2>
+                                <p className="serif italic text-sm">{analyzingWork.author}</p>
+                            </div>
+
+                            {analysisResults.map((r, i) => (
+                                <div key={i} className="mb-24 border-b border-black/5 dark:border-white/5 pb-16 last:border-0 last:pb-0 text-center">
+                                    <p className="font-serif text-2xl md:text-3xl leading-loose opacity-90 mb-8">
+                                        "{r.q}"
+                                    </p>
+                                    {r.b && (
+                                        <div className="max-w-lg mx-auto">
+                                            <p className="serif-text text-lg leading-relaxed opacity-60 italic">
+                                                {r.b}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            
+                            <div className="text-center mt-24 opacity-20">
+                                <i className="ph-fill ph-asterisk text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -401,7 +452,7 @@ export function WorksManager({ works, philosophers, onBack, onWorkAdded, onWorkD
 
                         <div className="grid grid-cols-1 gap-3">
                             {filteredWorks.map((work) => (
-                                <WorkCard key={work.id} work={work} interaction={userInteractions[work.id!]} onStatusChange={(s) => handleStatusChange(work.id!, s)} onRatingChange={(r) => handleRatingChange(work.id!, r)} onAnalyze={() => setAnalyzingWork(work)} onDelete={() => work.id && handleDeleteWork(work.id)} />
+                                <WorkCard key={work.id} work={work} interaction={userInteractions[work.id as number]} onStatusChange={(s) => handleStatusChange(work.id as number, s)} onRatingChange={(r) => handleRatingChange(work.id as number, r)} onAnalyze={() => setAnalyzingWork(work)} onDelete={() => work.id && handleDeleteWork(work.id)} />
                             ))}
                             {filteredWorks.length === 0 && <div className="text-center opacity-30 py-10 italic font-serif col-span-full">Tu estantería está vacía o no hay coincidencias.</div>}
                         </div>

@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
 import { getISO } from '../services/supabase';
+import { LevelBadge } from '../components/LevelBadge';
+import { UserAvatar } from '../components/Shared';
 
-export function CalendarView({ journal, openDay, user, onNavigateToProfile, onOpenSettings }: any) {
+export function CalendarView({ journal, openDay, user, userProfile, onNavigateToProfile, onOpenSettings }: any) {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
 
@@ -24,10 +26,12 @@ export function CalendarView({ journal, openDay, user, onNavigateToProfile, onOp
                     <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Registro de Vida</p>
                  </div>
                  <div className="flex items-center gap-3">
-                     <button onClick={onNavigateToProfile} className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] shadow-sm hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden">
-                        <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
+                     <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
+                     
+                     <button onClick={onNavigateToProfile} className="rounded-full shadow-sm hover:scale-105 transition-transform overflow-hidden">
+                        <UserAvatar name={user} avatarUrl={userProfile?.avatar} size="md" />
                      </button>
-                     <button onClick={onOpenSettings} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
+                     <button onClick={onOpenSettings} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
                         <i className="ph-bold ph-gear"></i>
                      </button>
                  </div>

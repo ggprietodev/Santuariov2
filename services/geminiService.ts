@@ -42,6 +42,44 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
     }
 };
 
+// --- CHAT WITH ORACLE (STOIC MENTOR) ---
+
+export const chatWithOracle = async (userMessage: string, history: { role: 'user' | 'model', content: string }[]) => {
+    const systemPrompt = `Actúa como el Oráculo Estoico. Eres una fusión de la sabiduría de Marco Aurelio, Séneca y Epicteto.
+    
+    Directrices:
+    1. Responde con brevedad y contundencia (máximo 3-4 frases).
+    2. Usa la dicotomía del control constantemente: distingue entre lo que depende del usuario y lo que no.
+    3. Cita frases estoicas famosas (parafraseadas o directas) cuando aplique.
+    4. Sé empático pero firme. No eres un bot de autoayuda genérico ("tú puedes", "ánimo"). Eres un mentor que exige virtud y razón.
+    5. Usa un tono sereno, atemporal y ligeramente místico.
+    
+    Si el usuario pregunta algo trivial, llévalo a un plano filosófico profundo.`;
+
+    try {
+        // Convert history to Gemini format
+        const formattedHistory = history.map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.content }]
+        }));
+
+        const chat = client.chats.create({
+            model: "gemini-3-flash-preview",
+            config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.7, // Balance between creativity and stoic rigidity
+            },
+            history: formattedHistory
+        });
+
+        const result = await chat.sendMessage({ message: userMessage });
+        return result.text || "El silencio es a veces la única respuesta.";
+    } catch (e) {
+        console.error("Oracle Chat Error", e);
+        return "El oráculo está meditando. Inténtalo de nuevo.";
+    }
+};
+
 // --- BASIC GENERATORS (Updated Prompts) ---
 
 export const definePhilosophicalTerm = async (term: string): Promise<GlossaryTerm | null> => {
@@ -83,6 +121,37 @@ export const askGemini = async (prompt: string): Promise<string | null> => {
         });
         return res.text || null;
     } catch (e) { console.error(e); return null; }
+};
+
+export const generatePremeditatioGuidance = async (context: string, step: 'worst_case' | 'prevention' | 'virtue'): Promise<string> => {
+    const prompts = {
+        worst_case: `El usuario teme: "${context}". Imagina el PEOR escenario realista posible desde una perspectiva estoica (Premeditatio Malorum). Sé crudo pero breve.`,
+        prevention: `Ante el miedo: "${context}". ¿Qué acciones preventivas concretas están BAJO SU CONTROL? Da 3 puntos breves.`,
+        virtue: `Si ocurre lo peor en: "${context}". ¿Qué virtud estoica (Coraje, Templanza, Justicia, Sabiduría) le ayudaría a soportarlo y cómo? Breve.`
+    };
+
+    try {
+        const res = await client.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompts[step]
+        });
+        return res.text || "";
+    } catch (e) { return ""; }
+};
+
+// NEW: Stoic Mantra Generator
+export const generateStoicMantra = async (context: string): Promise<string> => {
+    const prompt = `Genera un mantra estoico CORTÍSIMO (máx 5-7 palabras) y poderoso para repetir ante esta adversidad: "${context}".
+    Debe ser imperativo, fuerte y en español.
+    Ejemplos: "El obstáculo es el camino", "Esto también pasará", "Soporta y renuncia", "Soy la roca contra la ola".`;
+
+    try {
+        const res = await client.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt
+        });
+        return res.text?.replace(/"/g, '') || "Soporta y Renuncia.";
+    } catch (e) { return "Amor Fati."; }
 };
 
 export const expandReadingAI = async (title: string, quote: string, author: string) => {

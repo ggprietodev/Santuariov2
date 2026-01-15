@@ -31,7 +31,8 @@ const getSeededIndex = (seed: string, length: number): number => {
     return Math.abs(hash) % length;
 };
 
-export const getSeededRandomItem = <T>(dateStr: string, collection: T[], salt: string = ""): T | null => {
+// Fix for JSX parser: <T,> instead of <T>
+export const getSeededRandomItem = <T,>(dateStr: string, collection: T[], salt: string = ""): T | null => {
     if (!collection || collection.length === 0) return null;
     
     // Check for a user reset salt in local storage

@@ -123,17 +123,25 @@ export function LibraryModule({ user, readings, savedReadings, toggleSave, onBac
     schools: PhilosophySchool[],
     philosophers: PhilosopherBio[]
 }) {
-    const [sub, setSub] = useState<'explore' | 'saved'>('explore');
+    const [sub, setSub] = useState<'explore' | 'saved' | 'oracle'>('explore');
     const [filterMode, setFilterMode] = useState<'school' | 'topic'>('school');
     const [searchTerm, setSearchTerm] = useState("");
     const [activeFilter, setActiveFilter] = useState("Todos");
+    
+    // Zen Mode State
+    const [isZenMode, setIsZenMode] = useState(false);
     
     // Serendipity Modal State
     const [showRandomModal, setShowRandomModal] = useState(false);
     const [randomQuote, setRandomQuote] = useState<Reading | null>(null);
     
     // Derived Lists
-    const activeList = sub === 'explore' ? readings : savedReadings;
+    const activeList = useMemo(() => {
+        if (sub === 'explore') return readings;
+        if (sub === 'oracle') return savedReadings.filter((r: any) => r.type === 'oracle');
+        // 'saved' tab: show everything EXCEPT oracle (to keep tabs distinct)
+        return savedReadings.filter((r: any) => r.type !== 'oracle');
+    }, [sub, readings, savedReadings]);
 
     // Use actual school names for the filter list if available
     const uniqueSchools = useMemo(() => {
@@ -201,9 +209,14 @@ export function LibraryModule({ user, readings, savedReadings, toggleSave, onBac
                         <button onClick={onBack} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center shadow-sm active:scale-95 transition-transform border border-[var(--border)]"><i className="ph-bold ph-arrow-left"></i></button>
                         <h2 className="serif text-2xl font-bold">Biblioteca</h2>
                     </div>
-                    <button onClick={handleRandom} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)] hover:text-purple-500 transition-colors shadow-sm active:scale-90" title="Serendipia">
-                        <i className="ph-bold ph-dice-five text-lg"></i>
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsZenMode(true)} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors shadow-sm active:scale-90" title="Modo Zen">
+                            <i className="ph-bold ph-arrows-out-simple text-lg"></i>
+                        </button>
+                        <button onClick={handleRandom} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] text-[var(--text-sub)] hover:text-purple-500 transition-colors shadow-sm active:scale-90" title="Serendipia">
+                            <i className="ph-bold ph-dice-five text-lg"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 {/* Toggle Row */}
@@ -211,6 +224,7 @@ export function LibraryModule({ user, readings, savedReadings, toggleSave, onBac
                     <div className="flex bg-[var(--card)] p-1 rounded-xl border border-[var(--border)] w-full">
                         <button onClick={() => setSub('explore')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${sub==='explore' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-sm' : 'text-[var(--text-sub)]'}`}>Todo</button>
                         <button onClick={() => setSub('saved')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${sub==='saved' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-sm' : 'text-[var(--text-sub)]'}`}>Archivo</button>
+                        <button onClick={() => setSub('oracle')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${sub==='oracle' ? 'bg-[var(--text-main)] text-[var(--bg)] shadow-sm' : 'text-[var(--text-sub)]'}`}>Oráculo</button>
                     </div>
                 </div>
             </div>
@@ -263,7 +277,7 @@ export function LibraryModule({ user, readings, savedReadings, toggleSave, onBac
                     {filteredList.length === 0 && (
                         <div className="text-center opacity-30 py-20 font-serif italic flex flex-col items-center">
                             <i className="ph-duotone ph-books text-4xl mb-3"></i>
-                            {searchTerm ? "No hay coincidencias." : sub === 'saved' ? "Tu archivo está vacío." : "Nada por aquí."}
+                            {searchTerm ? "No hay coincidencias." : sub === 'saved' ? "Tu archivo está vacío." : sub === 'oracle' ? "Aún no has guardado consultas." : "Nada por aquí."}
                         </div>
                     )}
                     
@@ -272,12 +286,50 @@ export function LibraryModule({ user, readings, savedReadings, toggleSave, onBac
                             key={`${r.t}-${i}`} 
                             r={r} 
                             toggleSave={toggleSave} 
-                            isSaved={sub === 'saved' || savedReadings.some((sv:Reading) => sv.q === r.q)} 
+                            isSaved={savedReadings.some((sv:Reading) => sv.q === r.q)} 
                             onShare={onShare}
                         />
                     ))}
                 </div>
             </div>
+
+            {/* ZEN MODE OVERLAY */}
+            {isZenMode && (
+                <div className="fixed inset-0 z-[60] h-screen w-screen bg-[#fcfbf9] dark:bg-[#1c1c1c] overflow-y-auto animate-fade-in no-scrollbar text-[#2c2c2c] dark:text-[#e0e0e0]">
+                    <button 
+                        onClick={() => setIsZenMode(false)} 
+                        className="fixed top-6 right-6 p-4 text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors z-50 bg-transparent active:scale-90"
+                    >
+                        <i className="ph-bold ph-x text-3xl"></i>
+                    </button>
+                    
+                    <div className="max-w-2xl mx-auto px-8 py-32 min-h-screen">
+                        {filteredList.length > 0 ? filteredList.map((r, i) => (
+                            <div key={i} className="mb-32 text-center last:mb-0">
+                                <div className="mb-6">
+                                    <span className="text-[10px] font-bold uppercase tracking-[4px] opacity-20">{r.philosophy}</span>
+                                </div>
+                                <p className="font-serif text-2xl md:text-4xl leading-loose opacity-90 mb-8">
+                                    "{r.q}"
+                                </p>
+                                <div className="flex flex-col items-center gap-2 opacity-50">
+                                    <div className="w-8 h-[1px] bg-current mb-2"></div>
+                                    <p className="text-xs font-bold uppercase tracking-widest">{r.a}</p>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="flex flex-col items-center justify-center h-[50vh] opacity-30">
+                                <i className="ph-duotone ph-wind text-5xl mb-4"></i>
+                                <p className="serif italic">El silencio es elocuente.</p>
+                            </div>
+                        )}
+                        
+                        <div className="text-center mt-20 opacity-20">
+                            <i className="ph-fill ph-asterisk text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* SERENDIPITY MODAL */}
             {showRandomModal && randomQuote && (
