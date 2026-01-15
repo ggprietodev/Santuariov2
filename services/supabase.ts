@@ -128,12 +128,29 @@ export const fetchPremeditatioLogs = async (): Promise<PremeditatioLog[]> => {
 
 export const deletePremeditatioLog = async (id: string) => {
     try {
-        const { error } = await supabase
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return new Error("Usuario no autenticado");
+
+        // Use count: 'exact' to ensure we know if a row was actually deleted
+        const { error, count } = await supabase
             .from('premeditatio_logs')
-            .delete()
-            .eq('id', id);
-        return error;
+            .delete({ count: 'exact' })
+            .eq('id', id)
+            .eq('user_id', user.id); // Explicit check for ownership
+        
+        if (error) {
+            console.error("Supabase Error:", error);
+            return error;
+        }
+
+        if (count === 0) {
+            console.warn("No se borró ningún registro (posible error de permisos o ID incorrecto)");
+            return new Error("No se pudo eliminar el registro. Puede que no exista o no tengas permisos.");
+        }
+
+        return null;
     } catch (e) {
+        console.error("Excepción en deletePremeditatioLog:", e);
         return e;
     }
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { savePremeditatio, fetchPremeditatioLogs, deletePremeditatioLog } from '../services/supabase';
 import { generatePremeditatioGuidance, generateStoicMantra } from '../services/geminiService';
@@ -83,20 +82,26 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         }
     };
 
-    // FIXED DELETE HANDLER
+    // MANEJADOR DE BORRADO SIMPLIFICADO Y ROBUSTO
     const handleDelete = async (id: string) => {
+        // Usamos window.confirm nativo para simplificar
         if (window.confirm("¿Eliminar este registro permanentemente?")) {
-            // 1. Optimistic UI Update (Immediate)
+            // 1. Actualización Optimista (UI instantánea)
             const previousLogs = [...logs];
             setLogs(prev => prev.filter(l => l.id !== id));
 
-            // 2. Call DB
-            const error = await deletePremeditatioLog(id);
-            
-            // 3. Rollback if error
-            if (error) {
-                console.error("Delete failed", error);
-                alert("Error al eliminar. Inténtalo de nuevo.");
+            try {
+                // 2. Llamada a BBDD
+                const error = await deletePremeditatioLog(id);
+                
+                // 3. Rollback si falla
+                if (error) {
+                    console.error("Delete failed", error);
+                    alert("Error al eliminar. Verifica tu conexión.");
+                    setLogs(previousLogs);
+                }
+            } catch (e) {
+                console.error(e);
                 setLogs(previousLogs);
             }
         }
@@ -191,6 +196,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                 </div>
 
                 <div className="w-full max-w-2xl mx-auto px-6 pt-4 pb-2 bg-[var(--bg)] z-10 space-y-3">
+                    {/* Buscador y Filtros */}
                     <div className="flex gap-2">
                         <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] flex items-center gap-3 px-3 py-2 transition-colors focus-within:border-[var(--text-main)] shadow-sm flex-1">
                             <i className="ph-bold ph-magnifying-glass opacity-30 text-sm"></i>
@@ -249,24 +255,22 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     )}
                     
                     {filteredLogs.map((log) => (
-                        <div key={log.id} className="relative bg-[var(--card)] p-6 rounded-[24px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all isolate">
+                        <div key={log.id} className="relative bg-[var(--card)] p-6 rounded-[24px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all isolate group">
                             
-                            {/* FIXED DELETE BUTTON */}
-                            <button 
-                                type="button"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    e.nativeEvent.stopImmediatePropagation(); // Ensure click doesn't bubble
-                                    if(log.id) handleDelete(log.id);
-                                }}
-                                className="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-[var(--bg)] border border-[var(--border)] text-[var(--text-sub)] hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition-colors shadow-sm cursor-pointer z-[100]"
-                                aria-label="Borrar registro"
+                            {/* BOTÓN DE BORRAR ARREGLADO Y SIMPLIFICADO */}
+                            <div 
+                                className="absolute top-4 right-4 z-[50]"
+                                onClick={(e) => e.stopPropagation()} // ESTO EVITA QUE EL CLIC SE PROPAGUE A LA TARJETA
                             >
-                                <i className="ph-bold ph-trash text-lg pointer-events-none"></i>
-                            </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => log.id && handleDelete(log.id)}
+                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg)] border border-[var(--border)] text-[var(--text-sub)] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors shadow-sm"
+                                    title="Eliminar registro"
+                                >
+                                    <i className="ph-bold ph-trash text-lg"></i>
+                                </button>
+                            </div>
 
                             <div className="mb-4 pr-12">
                                 <div className="flex items-center gap-2 mb-2">
@@ -325,6 +329,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg)] animate-fade-in relative overflow-hidden">
+            {/* CABECERA WIZARD */}
             <div className="w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-6 z-20 shrink-0">
                 <button onClick={() => setView('list')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--highlight)] text-[var(--text-sub)] transition-colors border border-[var(--border)] shadow-sm">
                     <i className="ph-bold ph-list"></i>
@@ -337,6 +342,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                 <div className="w-10"></div>
             </div>
 
+            {/* CONTENIDO WIZARD */}
             <div className="flex-1 w-full max-w-xl mx-auto px-8 pb-6 overflow-y-auto no-scrollbar flex flex-col relative pt-6">
                 {step === 0 && (
                     <div className="text-center animate-fade-in space-y-6 flex flex-col justify-center flex-1">

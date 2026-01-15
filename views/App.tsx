@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions, addXP } from '../services/supabase';
 import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction, UserProfile } from '../types';
@@ -72,23 +71,14 @@ function SanctuaryView({
         }
     };
 
-    // --- COLOR LOGIC: Theme-Aware but Distinct ---
+    // --- COLOR LOGIC: FORZAMOS COLORES VIBRANTES SIEMPRE ---
     const styles = useMemo(() => {
-        const isCustomTheme = !['light', 'dark'].includes(theme);
+        // ELIMINAMOS LA RESTRICCION DE TEMA PARA QUE SIEMPRE SE VEAN LOS COLORES
+        // const isCustomTheme = !['light', 'dark'].includes(theme);
 
         // Helper to build card classes
         const getCardClasses = (bgClass: string, textClass: string, subClass: string, boxClass: string) => {
-            if (isCustomTheme) {
-                // For custom themes (Forest, Ocean), use the theme variables to avoid clashing
-                return {
-                    card: `bg-[var(--card)] border border-[var(--border)] shadow-sm group hover:scale-[1.02] duration-300`,
-                    icon: `text-[var(--gold)]`,
-                    title: `text-[var(--text-main)]`,
-                    sub: `text-[var(--text-sub)] opacity-60 text-[9px] uppercase font-bold tracking-widest`,
-                    box: `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)] shadow-sm`
-                };
-            }
-            // For standard Light/Dark modes, use distinct colors
+            // SIEMPRE DEVOLVEMOS EL COLOR ESPECÍFICO
             return {
                 card: `${bgClass} border border-transparent shadow-sm group hover:scale-[1.02] duration-300`,
                 icon: textClass,
