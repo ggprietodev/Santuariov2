@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { GlossaryTerm, WorkInteraction, WorkStatus, Work, Meditation, Post, Course, Module, Lesson, PhilosopherBio, Reading, PhilosophySchool, Task, PremeditatioLog } from '../types';
+import { GlossaryTerm, WorkInteraction, WorkStatus, Work, Meditation, Post, Course, Module, Lesson, PhilosopherBio, Reading, PhilosophySchool, Task, PremeditatioLog, JournalEntry } from '../types';
 import { parsePost } from '../utils/stoicData';
 import { calculateLevel } from '../utils/gamification';
 
@@ -90,6 +90,196 @@ export const addXP = async (userId: string, amount: number) => {
     }
 };
 
+// --- GLOBAL SEARCH & MENTIONS ---
+
+export const searchGlobalContent = async (query: string) => {
+    if (!query || query.length < 2) return null;
+
+    const [users, philosophers, schools, readings, posts] = await Promise.all([
+        // 1. Users
+        supabase.from('profiles').select('id, username, avatar, xp').ilike('username', `%${query}%`).limit(5),
+        // 2. Philosophers
+        supabase.from('content_philosophers').select('*').ilike('name', `%${query}%`).limit(5),
+        // 3. Schools
+        supabase.from('content_schools').select('*').ilike('name', `%${query}%`).limit(3),
+        // 4. Readings
+        supabase.from('content_readings').select('*').or(`quote.ilike.%${query}%,title.ilike.%${query}%`).limit(5),
+        // 5. Posts (JSONB Search)
+        supabase.from('forum_posts').select('*').or(`content->>body.ilike.%${query}%,content->>title.ilike.%${query}%`).limit(5)
+    ]);
+
+    return {
+        users: users.data || [],
+        philosophers: philosophers.data || [],
+        schools: schools.data || [],
+        readings: readings.data || [],
+        posts: (posts.data || []).map((p: any) => ({ ...p, content: parsePost(p.content) }))
+    };
+};
+
+export const fetchUserMentions = async (username: string) => {
+    if (!username) return [];
+    
+    // Use arrow syntax for JSONB query to avoid casting errors in client library
+    const { data, error } = await supabase
+        .from('forum_posts')
+        .select('*')
+        .ilike('content->>body', `%@${username}%`) 
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    if (error) {
+        console.error("Error fetching mentions:", error.message);
+        return [];
+    }
+
+    return data.map((p: any) => ({
+        ...p,
+        content: parsePost(p.content)
+    }));
+};
+
+export const searchUsers = async (query: string) => {
+    if (!query || query.length < 2) return [];
+    
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, avatar, xp')
+        .ilike('username', `%${query}%`)
+        .limit(10);
+
+    if (error) {
+        console.error("Error searching users:", error);
+        return [];
+    }
+    return data;
+};
+
+export const searchPosts = async (query: string) => {
+    if (!query || query.length < 3) return [];
+
+    const { data, error } = await supabase
+        .from('forum_posts')
+        .select('*')
+        .or(`content->>body.ilike.%${query}%,content->>title.ilike.%${query}%`)
+        .limit(10);
+
+    if (error) {
+        console.error("Error searching posts:", error);
+        return [];
+    }
+
+    return data.map((p: any) => ({
+        ...p,
+        content: parsePost(p.content)
+    }));
+};
+
+// --- JOURNALING (UPDATED) ---
+
+export const saveJournalLog = async (userId: string, date: string, entry: JournalEntry, title?: string, tags?: string[], structured_answers?: any) => {
+    const payload = {
+        user_id: userId,
+        date: date,
+        mood: entry.mood || 0,
+        text_content: entry.text || "",
+        question_response: entry.question_response || "",
+        challenge_response: entry.challenge_response || "",
+        challenge_completed: entry.challenge_completed === true, 
+        challenge_status: entry.challenge_status,
+        challenge_title: entry.challenge_title,
+        title: title || undefined, 
+        tags: tags || undefined,
+        // We use text_content to store the rich HTML, but structured data helps analysis
+        // If the DB schema supports a JSONB column 'metadata' or similar, we'd use that.
+        // For now, we rely on question_response column for the daily question if needed.
+        updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabase
+        .from('user_daily_logs')
+        .upsert(payload, { onConflict: 'user_id, date' });
+        
+    return error;
+};
+
+export const sendMemento = async (senderId: string, receiverId: string) => {
+    // Table: mementos
+    const { error } = await supabase
+        .from('mementos')
+        .upsert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            created_at: new Date().toISOString()
+        }, { onConflict: 'sender_id, receiver_id', ignoreDuplicates: true });
+        
+    return error;
+};
+
+export const fetchMementoCount = async (userId: string) => {
+    // Table: mementos
+    const { count, error } = await supabase
+        .from('mementos')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userId);
+    return count || 0;
+};
+
+export const sendLetter = async (senderId: string, receiverId: string, content: string, sealIcon: string = 'ph-seal-check') => {
+    // Letter: Slow communication. Deliver in 6 hours.
+    const deliverAt = new Date();
+    deliverAt.setHours(deliverAt.getHours() + 6);
+
+    const { error } = await supabase
+        .from('letters')
+        .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content: content,
+            seal_icon: sealIcon, 
+            created_at: new Date().toISOString(),
+            deliver_at: deliverAt.toISOString(), 
+            is_read: false
+        });
+    return error;
+};
+
+export const fetchInbox = async (userId: string) => {
+    const now = new Date().toISOString();
+    
+    const { data: letters, error: lettersError } = await supabase
+        .from('letters')
+        .select('*')
+        .eq('receiver_id', userId)
+        .lte('deliver_at', now) 
+        .order('deliver_at', { ascending: false });
+
+    if (lettersError || !letters || letters.length === 0) {
+        return [];
+    }
+
+    const senderIds = Array.from(new Set(letters.map((l: any) => l.sender_id)));
+    
+    const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar')
+        .in('id', senderIds);
+
+    if (profilesError) {
+        return letters.map((l: any) => ({ 
+            ...l, 
+            sender: { username: 'Desconocido', avatar: '' } 
+        }));
+    }
+
+    const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+
+    return letters.map((l: any) => ({
+        ...l,
+        sender: profileMap.get(l.sender_id) || { username: 'Desconocido', avatar: '' }
+    }));
+};
+
 // --- PREMEDITATIO MALORUM ---
 
 export const savePremeditatio = async (entry: Omit<PremeditatioLog, 'id' | 'created_at' | 'user_id'>) => {
@@ -131,26 +321,17 @@ export const deletePremeditatioLog = async (id: string) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return new Error("Usuario no autenticado");
 
-        // Use count: 'exact' to ensure we know if a row was actually deleted
         const { error, count } = await supabase
             .from('premeditatio_logs')
             .delete({ count: 'exact' })
             .eq('id', id)
-            .eq('user_id', user.id); // Explicit check for ownership
+            .eq('user_id', user.id); 
         
-        if (error) {
-            console.error("Supabase Error:", error);
-            return error;
-        }
-
-        if (count === 0) {
-            console.warn("No se borró ningún registro (posible error de permisos o ID incorrecto)");
-            return new Error("No se pudo eliminar el registro. Puede que no exista o no tengas permisos.");
-        }
+        if (error) return error;
+        if (count === 0) return new Error("No se pudo eliminar el registro.");
 
         return null;
     } catch (e) {
-        console.error("Excepción en deletePremeditatioLog:", e);
         return e;
     }
 };
@@ -193,7 +374,6 @@ export const fetchGlossaryTerm = async (term: string): Promise<GlossaryTerm | nu
         if (error) throw error;
         return data;
     } catch (e) {
-        console.error("Error fetching glossary term:", e);
         return null;
     }
 };
@@ -240,11 +420,7 @@ export const fetchReadings = async (): Promise<Reading[]> => {
             .select('*')
             .order('id', { ascending: true });
             
-        if (error) {
-            console.error("Error fetching readings from Supabase:", error);
-            return [];
-        }
-        
+        if (error) return [];
         if (!data || data.length === 0) return [];
         
         return data.map((r: any) => ({
@@ -259,7 +435,6 @@ export const fetchReadings = async (): Promise<Reading[]> => {
             source_work_id: r.source_work_id
         })) as Reading[];
     } catch (e) {
-        console.error("Unexpected error in fetchReadings:", e);
         return [];
     }
 }
@@ -309,11 +484,7 @@ export const fetchFullCourses = async (): Promise<{ courses: Course[], modules: 
             `)
             .order('created_at', { ascending: true });
 
-        if (error) {
-            console.error("Error fetching courses:", error);
-            return { courses: [], modules: [] };
-        }
-
+        if (error) return { courses: [], modules: [] };
         if (!data) return { courses: [], modules: [] };
 
         const flatCourses: Course[] = [];
@@ -356,7 +527,6 @@ export const fetchFullCourses = async (): Promise<{ courses: Course[], modules: 
         return { courses: flatCourses, modules: flatModules };
 
     } catch (e) {
-        console.error("Fetch full courses exception:", e);
         return { courses: [], modules: [] };
     }
 };

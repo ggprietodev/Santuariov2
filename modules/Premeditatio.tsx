@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { savePremeditatio, fetchPremeditatioLogs, deletePremeditatioLog } from '../services/supabase';
 import { generatePremeditatioGuidance, generateStoicMantra } from '../services/geminiService';
@@ -33,6 +34,9 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
     
     const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
+
+    // DELETE CONFIRMATION STATE
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     useEffect(() => {
         if (view === 'list') {
@@ -82,28 +86,37 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         }
     };
 
-    // MANEJADOR DE BORRADO SIMPLIFICADO Y ROBUSTO
-    const handleDelete = async (id: string) => {
-        // Usamos window.confirm nativo para simplificar
-        if (window.confirm("¿Eliminar este registro permanentemente?")) {
-            // 1. Actualización Optimista (UI instantánea)
-            const previousLogs = [...logs];
-            setLogs(prev => prev.filter(l => l.id !== id));
+    // TWO-STEP DELETE HANDLER
+    const requestDelete = (id: string) => {
+        if (deleteConfirmId === id) {
+            // Confirmed
+            handleExecuteDelete(id);
+            setDeleteConfirmId(null);
+        } else {
+            // First click
+            setDeleteConfirmId(id);
+            // Auto-cancel after 3s
+            setTimeout(() => {
+                setDeleteConfirmId(prev => prev === id ? null : prev);
+            }, 3000);
+        }
+    };
 
-            try {
-                // 2. Llamada a BBDD
-                const error = await deletePremeditatioLog(id);
-                
-                // 3. Rollback si falla
-                if (error) {
-                    console.error("Delete failed", error);
-                    alert("Error al eliminar. Verifica tu conexión.");
-                    setLogs(previousLogs);
-                }
-            } catch (e) {
-                console.error(e);
-                setLogs(previousLogs);
-            }
+    const handleExecuteDelete = async (id: string) => {
+        console.log("Ejecutando borrado para:", id);
+        
+        // 1. Optimistic UI Update
+        const previousLogs = [...logs];
+        setLogs(prev => prev.filter(l => l.id !== id));
+
+        // 2. Call DB
+        const error = await deletePremeditatioLog(id);
+        
+        // 3. Rollback if error
+        if (error) {
+            console.error("Delete failed in DB", error);
+            alert("Error al eliminar: " + (error.message || "Error desconocido"));
+            setLogs(previousLogs);
         }
     };
 
@@ -174,9 +187,9 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
     }, [logs, searchTerm, filterStart, filterEnd]);
 
     const getConfidenceColor = (score: number) => {
-        if (score >= 8) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-        if (score >= 5) return 'text-amber-600 bg-amber-50 border-amber-200';
-        return 'text-rose-600 bg-rose-50 border-rose-200';
+        if (score >= 8) return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800';
+        if (score >= 5) return 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800';
+        return 'text-rose-600 bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800';
     };
 
     // --- LIST VIEW ---
@@ -196,7 +209,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                 </div>
 
                 <div className="w-full max-w-2xl mx-auto px-6 pt-4 pb-2 bg-[var(--bg)] z-10 space-y-3">
-                    {/* Buscador y Filtros */}
                     <div className="flex gap-2">
                         <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] flex items-center gap-3 px-3 py-2 transition-colors focus-within:border-[var(--text-main)] shadow-sm flex-1">
                             <i className="ph-bold ph-magnifying-glass opacity-30 text-sm"></i>
@@ -245,7 +257,7 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-6 pb-20 max-w-2xl mx-auto w-full no-scrollbar space-y-4 pt-4">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-20 max-w-2xl mx-auto w-full no-scrollbar space-y-6 pt-4">
                     {loadingLogs && <div className="text-center py-10 opacity-50"><i className="ph-duotone ph-spinner animate-spin text-2xl"></i></div>}
                     {!loadingLogs && filteredLogs.length === 0 && (
                         <div className="text-center py-20 opacity-30 flex flex-col items-center">
@@ -255,71 +267,100 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                     )}
                     
                     {filteredLogs.map((log) => (
-                        <div key={log.id} className="relative bg-[var(--card)] p-6 rounded-[24px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all isolate group">
+                        <div key={log.id} className="relative group bg-[var(--card)] rounded-[32px] border border-[var(--border)] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col isolate">
                             
-                            {/* BOTÓN DE BORRAR ARREGLADO Y SIMPLIFICADO */}
-                            <div 
-                                className="absolute top-4 right-4 z-[50]"
-                                onClick={(e) => e.stopPropagation()} // ESTO EVITA QUE EL CLIC SE PROPAGUE A LA TARJETA
-                            >
-                                <button 
-                                    type="button"
-                                    onClick={() => log.id && handleDelete(log.id)}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg)] border border-[var(--border)] text-[var(--text-sub)] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors shadow-sm"
-                                    title="Eliminar registro"
-                                >
-                                    <i className="ph-bold ph-trash text-lg"></i>
-                                </button>
-                            </div>
-
-                            <div className="mb-4 pr-12">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                        {new Date(log.created_at!).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                            {/* Card Header Row */}
+                            <div className="flex justify-between items-start p-6 pb-2">
+                                {/* Date Badge */}
+                                <div className="flex flex-col pr-4">
+                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-1 flex items-center gap-1">
+                                        <i className="ph-bold ph-calendar-blank"></i>
+                                        {new Date(log.created_at!).toLocaleDateString(undefined, {month:'long', day:'numeric', year:'numeric'})}
                                     </span>
-                                    <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${getConfidenceColor(log.confidence_score || 5)}`}>
-                                        Confianza {log.confidence_score || 5}/10
+                                    <h3 className="serif text-xl sm:text-2xl font-bold leading-tight text-[var(--text-main)] mb-2 line-clamp-2">{log.event_context}</h3>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-col items-end gap-2 shrink-0">
+                                    <button 
+                                        type="button"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if(log.id) requestDelete(log.id);
+                                        }}
+                                        className={`h-8 rounded-full border transition-all shadow-sm cursor-pointer flex items-center justify-center ${deleteConfirmId === log.id ? 'w-20 bg-rose-500 text-white border-rose-600' : 'w-8 bg-[var(--bg)] border-[var(--border)] text-[var(--text-sub)] hover:bg-rose-50 hover:text-rose-500'}`}
+                                    >
+                                        {deleteConfirmId === log.id ? (
+                                            <span className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-1"><i className="ph-bold ph-trash"></i> Borrar</span>
+                                        ) : (
+                                            <i className="ph-bold ph-trash"></i>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Mantra Highlight */}
+                            {log.mantra && (
+                                <div className="px-6 mb-4">
+                                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/20 flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-[var(--bg)] flex items-center justify-center text-amber-500 shrink-0 shadow-sm border border-amber-100 dark:border-amber-800/30">
+                                            <i className="ph-fill ph-lightning text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-[8px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300 block opacity-60 mb-0.5">Mantra de Poder</span>
+                                            <p className="serif font-bold text-sm text-amber-900 dark:text-amber-100 italic leading-snug">"{log.mantra}"</p>
+                                        </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Tri-Grid Content */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-[var(--border)] divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)] bg-[var(--highlight)]/20">
                                 
-                                <h3 className="serif text-xl font-bold leading-tight text-[var(--text-main)] mb-1">{log.event_context}</h3>
-                                {log.mantra && (
-                                    <p className="serif text-sm italic text-[var(--text-main)] opacity-70 mt-1">"{log.mantra}"</p>
-                                )}
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="pl-4 border-l-2 border-rose-200 dark:border-rose-900/50">
-                                    <div className="flex items-center gap-1.5 mb-1 opacity-70">
-                                        <i className="ph-fill ph-skull text-rose-500 text-xs"></i>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">Lo Peor</span>
+                                <div className="p-5 flex flex-col gap-2 hover:bg-[var(--card)] transition-colors">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400 text-xs shadow-sm">
+                                            <i className="ph-fill ph-skull"></i>
+                                        </div>
+                                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">Lo Peor</span>
                                     </div>
-                                    <p className="serif-text text-sm opacity-90 leading-relaxed text-[var(--text-main)]">
-                                        {log.worst_case}
-                                    </p>
+                                    <p className="serif-text text-sm opacity-80 leading-relaxed">{log.worst_case}</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-5 pt-1">
-                                    <div className="pl-4 border-l-2 border-stone-200 dark:border-stone-800">
-                                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
-                                            <i className="ph-fill ph-shield text-stone-500 text-xs"></i>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest">Control</span>
+                                <div className="p-5 flex flex-col gap-2 hover:bg-[var(--card)] transition-colors">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-6 h-6 rounded-full bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-600 dark:text-stone-400 text-xs shadow-sm">
+                                            <i className="ph-fill ph-shield"></i>
                                         </div>
-                                        <p className="serif-text text-sm opacity-80 leading-relaxed">
-                                            {log.prevention}
-                                        </p>
+                                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">Defensa</span>
                                     </div>
-                                    <div className="pl-4 border-l-2 border-emerald-200 dark:border-emerald-900/50">
-                                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
-                                            <i className="ph-fill ph-sparkle text-emerald-500 text-xs"></i>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Virtud</span>
+                                    <p className="serif-text text-sm opacity-80 leading-relaxed">{log.prevention}</p>
+                                </div>
+
+                                <div className="p-5 flex flex-col gap-2 hover:bg-[var(--card)] transition-colors">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-xs shadow-sm">
+                                            <i className="ph-fill ph-sparkle"></i>
                                         </div>
-                                        <p className="serif-text text-sm opacity-80 leading-relaxed">
-                                            {log.virtue_response}
-                                        </p>
+                                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-60">Virtud</span>
                                     </div>
+                                    <p className="serif-text text-sm opacity-80 leading-relaxed">{log.virtue_response}</p>
+                                </div>
+
+                            </div>
+                            
+                            {/* Footer: Confidence Score */}
+                            <div className="bg-[var(--card)] px-6 py-3 border-t border-[var(--border)] flex justify-between items-center">
+                                <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">Preparación Mental</span>
+                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${getConfidenceColor(log.confidence_score || 5)}`}>
+                                    <i className="ph-fill ph-chart-bar"></i> {log.confidence_score || 5} / 10
                                 </div>
                             </div>
+
                         </div>
                     ))}
                 </div>
@@ -327,9 +368,9 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
         );
     }
 
+    // --- CREATE MODE (UNCHANGED) ---
     return (
         <div className="flex flex-col h-full bg-[var(--bg)] animate-fade-in relative overflow-hidden">
-            {/* CABECERA WIZARD */}
             <div className="w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-6 z-20 shrink-0">
                 <button onClick={() => setView('list')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--highlight)] text-[var(--text-sub)] transition-colors border border-[var(--border)] shadow-sm">
                     <i className="ph-bold ph-list"></i>
@@ -342,7 +383,6 @@ export function Premeditatio({ onBack }: PremeditatioProps) {
                 <div className="w-10"></div>
             </div>
 
-            {/* CONTENIDO WIZARD */}
             <div className="flex-1 w-full max-w-xl mx-auto px-8 pb-6 overflow-y-auto no-scrollbar flex flex-col relative pt-6">
                 {step === 0 && (
                     <div className="text-center animate-fade-in space-y-6 flex flex-col justify-center flex-1">

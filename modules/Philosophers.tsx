@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { PhilosopherBio, Reading, Work, GlossaryTerm } from '../types';
-import { generateDeepDive, generatePhilosopherProfile, definePhilosophicalTerm } from '../services/geminiService';
+import { generateDeepDive, generatePhilosopherProfile, definePhilosophicalTerm, expandReadingAI } from '../services/geminiService';
 import { fetchGlossaryTerm } from '../services/supabase';
 
 const SCHOOL_COLORS: Record<string, string> = {
@@ -48,6 +48,11 @@ export function PhilosophersModule({ onBack, toggleSave, savedReadings, followed
     const [bioWorksContent, setBioWorksContent] = useState<{bio: string, works: {title: string, desc: string}[]} | null>(null);
     
     const [viewQuotes, setViewQuotes] = useState(false);
+
+    // AI Insight State for Quotes
+    const [expandedQuoteIndex, setExpandedQuoteIndex] = useState<number | null>(null);
+    const [insightContent, setInsightContent] = useState<string | null>(null);
+    const [isInsightLoading, setIsInsightLoading] = useState(false);
 
     // Glossary State
     const [glossaryItem, setGlossaryItem] = useState<GlossaryTerm | null>(null);
@@ -179,6 +184,22 @@ export function PhilosophersModule({ onBack, toggleSave, savedReadings, followed
         }
     };
 
+    const handleExpandQuote = async (quote: string, author: string, index: number) => {
+        if (expandedQuoteIndex === index) { 
+            setExpandedQuoteIndex(null); 
+            setInsightContent(null);
+            return; 
+        }
+        setExpandedQuoteIndex(index);
+        setIsInsightLoading(true);
+        setInsightContent(null);
+        
+        const text = await expandReadingAI("Profundización", quote, author);
+        
+        setInsightContent(text);
+        setIsInsightLoading(false);
+    }
+
     // NEW: Handle searching for a missing philosopher/term via AI directly from the list
     const handleAiLookup = async () => {
         if (!searchTerm) return;
@@ -207,6 +228,8 @@ export function PhilosophersModule({ onBack, toggleSave, savedReadings, followed
             setViewQuotes(false);
             setQuoteSearchTerm("");
             setQuoteTypeFilter("all");
+            setExpandedQuoteIndex(null);
+            setInsightContent(null);
         }
     }
 
@@ -412,9 +435,16 @@ export function PhilosophersModule({ onBack, toggleSave, savedReadings, followed
                         <div className="flex justify-between items-center mb-6">
                              <button onClick={closeModal} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center shadow-sm border border-[var(--border)] active:scale-95 transition-transform"><i className="ph-bold ph-x"></i></button>
                              <div className="text-[10px] font-bold uppercase tracking-widest opacity-40">{viewQuotes ? 'Archivo de Citas' : 'Perfil'}</div>
-                             <button onClick={() => toggleFollowPhilosopher(selectedBio.id)} className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition-colors ${isFollowing(selectedBio.id) ? 'bg-[var(--gold)] border-[var(--gold)] text-white' : 'bg-[var(--card)] border border-[var(--border)] text-[var(--text-sub)]'}`}>
-                                 <i className={`ph-${isFollowing(selectedBio.id) ? 'fill' : 'bold'} ph-star text-lg`}></i>
-                             </button>
+                             <div className="flex gap-2">
+                                 {viewQuotes && (
+                                     <button onClick={() => { setQuoteSearchTerm(""); setQuoteTypeFilter("all"); }} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center shadow-sm border border-[var(--border)] text-[var(--text-sub)] hover:text-rose-500 transition-colors" title="Resetear Filtros">
+                                         <i className="ph-bold ph-arrow-counter-clockwise"></i>
+                                     </button>
+                                 )}
+                                 <button onClick={() => toggleFollowPhilosopher(selectedBio.id)} className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border transition-colors ${isFollowing(selectedBio.id) ? 'bg-[var(--gold)] border-[var(--gold)] text-white' : 'bg-[var(--card)] border border-[var(--border)] text-[var(--text-sub)]'}`}>
+                                     <i className={`ph-${isFollowing(selectedBio.id) ? 'fill' : 'bold'} ph-star text-lg`}></i>
+                                 </button>
+                             </div>
                         </div>
 
                         {viewQuotes ? (
@@ -456,12 +486,40 @@ export function PhilosophersModule({ onBack, toggleSave, savedReadings, followed
                                         <div key={i} className="bg-[var(--card)] p-6 rounded-[24px] border border-[var(--border)] shadow-sm">
                                             <div className="flex justify-between items-start mb-2 opacity-40 hover:opacity-100 transition-opacity">
                                                 <span className="text-[9px] font-bold uppercase tracking-widest border border-[var(--border)] px-2 py-1 rounded-full">{r.type || 'Cita'}</span>
-                                                <button onClick={() => toggleSave(r)} className={`text-lg active:scale-90 transition-transform ${isSaved(r) ? 'text-[var(--gold)]' : 'hover:text-[var(--gold)]'}`}>
+                                                <button onClick={() => toggleSave(r)} className={`text-xl transition-all active:scale-90 ${isSaved(r) ? 'text-[var(--gold)]' : 'hover:text-[var(--gold)]'}`}>
                                                     <i className={`ph-${isSaved(r) ? 'fill' : 'bold'} ph-bookmark-simple`}></i>
                                                 </button>
                                             </div>
-                                            <p className="serif italic text-base leading-loose text-[var(--text-main)] mb-3">"{r.q}"</p>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">{r.t}</span>
+                                            <p className="serif text-lg leading-relaxed text-[var(--text-main)] mb-3">{r.q}</p>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">{r.t}</span>
+                                                <button 
+                                                    onClick={() => handleExpandQuote(r.q, r.a || selectedBio.name, i)}
+                                                    className="w-8 h-8 rounded-full hover:bg-[var(--highlight)] flex items-center justify-center text-purple-500 transition-colors"
+                                                    title="Profundizar"
+                                                >
+                                                    <i className="ph-fill ph-sparkle"></i>
+                                                </button>
+                                            </div>
+                                            
+                                            {/* AI INSIGHT FOR QUOTE */}
+                                            {expandedQuoteIndex === i && (
+                                                <div className="mt-4 bg-[#FAF5FF] dark:bg-[#1E1024] p-4 rounded-xl border border-purple-200 dark:border-purple-800 animate-fade-in relative">
+                                                    <div className="flex items-center gap-2 mb-2 text-purple-700 dark:text-purple-300">
+                                                        <i className="ph-bold ph-sparkle text-xs"></i>
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest">Insight</span>
+                                                    </div>
+                                                    {isInsightLoading && !insightContent ? (
+                                                        <div className="flex gap-1 justify-center py-2 opacity-50">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"></div>
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{animationDelay:'0.1s'}}></div>
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{animationDelay:'0.2s'}}></div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="serif-text text-sm leading-relaxed opacity-90 whitespace-pre-wrap text-purple-900 dark:text-purple-100">{insightContent}</p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                     <button onClick={() => setViewQuotes(false)} className="w-full py-4 mt-8 bg-[var(--highlight)] text-[var(--text-main)] rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors border border-[var(--border)]">Volver al Perfil</button>

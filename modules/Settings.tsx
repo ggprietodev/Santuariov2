@@ -4,7 +4,6 @@ import { AdminGenerator } from './AdminGenerator';
 import { getISO, updateUserPassword } from '../services/supabase';
 
 export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setFontTheme, fontSize, setFontSize, zenMode, toggleZen, onBack, onLogout, journal, masterSchools, masterPhilosophers, onAddXP }: any) {
-    const [nameInput, setNameInput] = useState(user);
     const [showAdmin, setShowAdmin] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
 
@@ -31,14 +30,6 @@ export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setF
         if (key.includes('notify') && newValue) {
             alert("Notificaciones simuladas activadas. (PWA Feature)");
         }
-    }
-
-    const handleSave = () => {
-        if(nameInput.trim()) {
-            setUser(nameInput.trim());
-            localStorage.setItem('stoic_username_override', nameInput.trim());
-        }
-        onBack();
     }
 
     const handlePasswordUpdate = async () => {
@@ -125,7 +116,7 @@ export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setF
 
     const ThemeBubble = ({ id, label, bg, active }: { id: string, label: string, bg: string, active: boolean }) => (
         <button 
-            onClick={() => setTheme(id)} // Using setTheme passed from App
+            onClick={() => setTheme(id)} 
             className={`flex flex-col items-center gap-2 transition-all ${active ? 'scale-110' : 'opacity-60 hover:opacity-100'}`}
         >
             <div 
@@ -150,34 +141,15 @@ export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setF
                 
                 <div className="flex-1 overflow-y-auto no-scrollbar p-6 pb-20">
                     
-                    {/* Identity Input */}
-                    <div className="mb-8">
-                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-3 ml-4">Identidad</label>
-                        <div className="bg-[var(--card)] p-2 rounded-[24px] border border-[var(--border)] flex items-center shadow-sm">
-                            <div className="w-12 h-12 rounded-full bg-[var(--highlight)] flex items-center justify-center text-xl shrink-0">
-                                <i className="ph-fill ph-user-circle"></i>
-                            </div>
-                            <input 
-                                value={nameInput}
-                                onChange={(e) => setNameInput(e.target.value)}
-                                className="w-full bg-transparent p-3 outline-none font-serif text-lg font-bold border-none"
-                                placeholder="Tu Nombre"
-                            />
-                            <button onClick={handleSave} className="px-4 py-2 bg-[var(--text-main)] text-[var(--bg)] rounded-xl text-xs font-bold uppercase tracking-wider mr-1 shadow-sm">
-                                Guardar
-                            </button>
-                        </div>
-                    </div>
-
                     <SectionHeader title="Atmósfera" />
                     
-                    {/* THEME SELECTOR - Correctly passing IDs now */}
+                    {/* THEME SELECTOR */}
                     <div className="flex justify-between items-center bg-[var(--card)] p-5 rounded-[24px] border border-[var(--border)] shadow-sm mb-6 overflow-x-auto no-scrollbar gap-4">
                         <ThemeBubble id="light" label="Día" bg="#FDFBF9" active={theme === 'light'} />
                         <ThemeBubble id="dark" label="Noche" bg="#121212" active={theme === 'dark'} />
-                        <ThemeBubble id="forest" label="Bosque" bg="#F1F5F3" active={theme === 'forest'} />
-                        <ThemeBubble id="ocean" label="Mar" bg="#F0F5F9" active={theme === 'ocean'} />
-                        <ThemeBubble id="sunset" label="Tierra" bg="#FFFBF7" active={theme === 'sunset'} />
+                        <ThemeBubble id="forest" label="Bosque" bg="#1a2e1a" active={theme === 'forest'} />
+                        <ThemeBubble id="ocean" label="Mar" bg="#0f172a" active={theme === 'ocean'} />
+                        <ThemeBubble id="sunset" label="Tierra" bg="#2c1810" active={theme === 'sunset'} />
                     </div>
 
                     <div className="shadow-sm rounded-[24px] overflow-hidden mb-2 border border-[var(--border)] bg-[var(--card)]">
@@ -307,7 +279,7 @@ export function SettingsModule({ user, setUser, theme, setTheme, fontTheme, setF
                     )}
 
                     <div className="text-center opacity-30 text-[9px] font-bold uppercase tracking-widest pb-4">
-                        Santuario v2.9.6 • Stoic OS
+                        Santuario v2.9.7 • Stoic OS
                     </div>
                 </div>
              </div>

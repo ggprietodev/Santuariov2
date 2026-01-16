@@ -4,7 +4,7 @@ import { getISO } from '../services/supabase';
 import { LevelBadge } from '../components/LevelBadge';
 import { UserAvatar } from '../components/Shared';
 
-export function CalendarView({ journal, openDay, user, userProfile, onNavigateToProfile, onOpenSettings }: any) {
+export function CalendarView({ journal, openDay, user, userProfile, onNavigateToProfile, onOpenSettings, onOpenSearch }: any) {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today);
 
@@ -19,7 +19,7 @@ export function CalendarView({ journal, openDay, user, userProfile, onNavigateTo
     return (
         <div className="flex flex-col h-full bg-[var(--bg)] animate-fade-in items-center">
             
-            {/* Standard Header (Enhanced Translucent) */}
+            {/* Standard Header */}
             <div className="w-full max-w-4xl flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg)]/70 backdrop-blur-xl sticky top-0 z-40 transition-all">
                  <div>
                     <h2 className="serif text-2xl font-bold">Calendario</h2>
@@ -28,6 +28,10 @@ export function CalendarView({ journal, openDay, user, userProfile, onNavigateTo
                  <div className="flex items-center gap-3">
                      <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
                      
+                     <button onClick={onOpenSearch} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
+                        <i className="ph-bold ph-magnifying-glass"></i>
+                     </button>
+
                      <button onClick={onNavigateToProfile} className="rounded-full shadow-sm hover:scale-105 transition-transform overflow-hidden">
                         <UserAvatar name={user} avatarUrl={userProfile?.avatar} size="md" />
                      </button>
@@ -69,11 +73,16 @@ export function CalendarView({ journal, openDay, user, userProfile, onNavigateTo
                         const isToday = iso === getISO(today);
                         const mood = entry?.mood || 0;
                         const hasContent = entry?.text || entry?.question_response;
-                        const hasChallenge = !!entry?.challenge_completed;
+                        
+                        // Check ritual types based on text/title content or tags
+                        const contentStr = (entry?.text || "") + (entry?.question_response || "");
+                        const isMorning = contentStr.includes("Amanecer") || (entry?.tags && entry.tags.includes('morning'));
+                        const isEvening = contentStr.includes("Anochecer") || (entry?.tags && entry.tags.includes('evening'));
+                        const isFree = !isMorning && !isEvening && hasContent;
 
                         return (
                             <div key={iso} onClick={() => openDay(iso)} 
-                                className={`aspect-square rounded-[18px] md:rounded-[22px] transition-all cursor-pointer relative overflow-hidden group
+                                className={`aspect-square rounded-[18px] md:rounded-[22px] transition-all cursor-pointer relative overflow-hidden group flex flex-col items-center justify-center
                                     ${mood ? 'text-white shadow-sm' : 'bg-[var(--highlight)]/30 hover:bg-[var(--highlight)] text-[var(--text-main)]'}
                                     ${isToday && !mood ? 'bg-[var(--highlight)] ring-2 ring-[var(--gold)] ring-inset' : ''}
                                 `}
@@ -81,15 +90,11 @@ export function CalendarView({ journal, openDay, user, userProfile, onNavigateTo
                             >
                                 <div className={`absolute top-1.5 left-2 md:top-2 md:left-3 text-xs md:text-sm font-semibold ${isToday && !mood ? 'text-[var(--text-main)]' : ''}`}>{dayNum}</div>
                                 
-                                {hasChallenge && (
-                                    <div className={`absolute top-1.5 right-1.5 md:top-2 md:right-2 text-[8px] md:text-[10px] ${mood ? 'text-white/90' : 'text-amber-500'}`}>
-                                        <i className="ph-fill ph-sword"></i>
-                                    </div>
-                                )}
-
-                                {hasContent && (
-                                    <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${mood ? 'bg-white/60' : 'bg-[var(--text-sub)]'}`}></div>
-                                )}
+                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                    {isMorning && <div className="w-1.5 h-1.5 rounded-full bg-amber-300 shadow-sm"></div>}
+                                    {isEvening && <div className="w-1.5 h-1.5 rounded-full bg-indigo-200 shadow-sm"></div>}
+                                    {isFree && <div className="w-1.5 h-1.5 rounded-full bg-white/50"></div>}
+                                </div>
                             </div>
                         );
                     })}

@@ -1,10 +1,9 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PhilosophySchool, PhilosopherBio, Work, Reading, GlossaryTerm } from '../types';
-import { generateDeepDive, generateSchoolSchematic, definePhilosophicalTerm } from '../services/geminiService';
+import { generateDeepDive, generateSchoolSchematic, definePhilosophicalTerm, expandReadingAI } from '../services/geminiService';
 import { fetchGlossaryTerm } from '../services/supabase';
 
-export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave, savedReadings, readings, onNavigateToPhilosopher }: { 
+export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave, savedReadings, readings, onNavigateToPhilosopher, initialSelectedSchool }: { 
     onBack: () => void, 
     schools: PhilosophySchool[], 
     philosophers: PhilosopherBio[], 
@@ -12,9 +11,19 @@ export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave
     toggleSave: (r: Reading) => void,
     savedReadings: Reading[],
     readings: Reading[],
-    onNavigateToPhilosopher: (id: string) => void
+    onNavigateToPhilosopher: (id: string) => void,
+    initialSelectedSchool?: string | null
 }) {
     const [selectedSchool, setSelectedSchool] = useState<PhilosophySchool | null>(null);
+    
+    // Handle Deep Link
+    useEffect(() => {
+        if (initialSelectedSchool) {
+            const found = schools.find(s => s.name === initialSelectedSchool);
+            if (found) setSelectedSchool(found);
+        }
+    }, [initialSelectedSchool, schools]);
+
     const [searchTerm, setSearchTerm] = useState("");
     
     // Quote Archive State
@@ -27,6 +36,11 @@ export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave
     const [schematicContent, setSchematicContent] = useState<{origin: string, dogmas: string[], practices: string[], legacy: string} | null>(null);
     
     const [viewQuotes, setViewQuotes] = useState(false);
+
+    // AI Insight State for Quotes
+    const [expandedQuoteIndex, setExpandedQuoteIndex] = useState<number | null>(null);
+    const [insightContent, setInsightContent] = useState<string | null>(null);
+    const [isInsightLoading, setIsInsightLoading] = useState(false);
 
     // Glossary State
     const [glossaryItem, setGlossaryItem] = useState<GlossaryTerm | null>(null);
@@ -127,6 +141,22 @@ export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave
         }
     };
 
+    const handleExpandQuote = async (quote: string, author: string, index: number) => {
+        if (expandedQuoteIndex === index) { 
+            setExpandedQuoteIndex(null); 
+            setInsightContent(null);
+            return; 
+        }
+        setExpandedQuoteIndex(index);
+        setIsInsightLoading(true);
+        setInsightContent(null);
+        
+        const text = await expandReadingAI("Profundización", quote, author);
+        
+        setInsightContent(text);
+        setIsInsightLoading(false);
+    }
+
     // NEW: Handle missing school lookup via AI
     const handleAiLookup = async () => {
         if (!searchTerm) return;
@@ -142,12 +172,21 @@ export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave
     const isSaved = (content: Reading) => savedReadings.some((r: Reading) => r.t === content.t);
 
     const closeModal = () => {
-        setSelectedSchool(null);
-        setGeneratedContent(null);
-        setSchematicContent(null);
-        setViewQuotes(false);
-        setQuoteSearchTerm("");
-        setQuoteTypeFilter("all");
+        // Clear deep link state if needed, but for now just clear local state
+        // If we are in "deep link mode" in App.tsx (returnToToday=true), onBack() will handle navigating back to Today or Menu
+        // Here we just clear the selection
+        if (initialSelectedSchool && selectedSchool?.name === initialSelectedSchool) {
+            onBack();
+        } else {
+            setSelectedSchool(null);
+            setGeneratedContent(null);
+            setSchematicContent(null);
+            setViewQuotes(false);
+            setQuoteSearchTerm("");
+            setQuoteTypeFilter("all");
+            setExpandedQuoteIndex(null);
+            setInsightContent(null);
+        }
     }
 
     const resetQuoteFilters = () => {
@@ -246,10 +285,38 @@ export function SchoolsModule({ onBack, schools, philosophers, works, toggleSave
                                         </button>
                                     </div>
                                     <p className="serif text-lg leading-relaxed mb-3 text-[var(--text-main)]">"{r.q}"</p>
-                                    <div className="flex items-center gap-2 opacity-40">
-                                        <i className="ph-bold ph-pen-nib text-xs"></i>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">{r.a}</span>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 opacity-40">
+                                            <i className="ph-bold ph-pen-nib text-xs"></i>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest">{r.a}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleExpandQuote(r.q, r.a || selectedSchool.name, i)}
+                                            className="w-8 h-8 rounded-full hover:bg-[var(--highlight)] flex items-center justify-center text-purple-500 transition-colors"
+                                            title="Profundizar"
+                                        >
+                                            <i className="ph-fill ph-sparkle"></i>
+                                        </button>
                                     </div>
+
+                                    {/* AI INSIGHT FOR QUOTE */}
+                                    {expandedQuoteIndex === i && (
+                                        <div className="mt-4 bg-[#FAF5FF] dark:bg-[#1E1024] p-4 rounded-xl border border-purple-200 dark:border-purple-800 animate-fade-in relative">
+                                            <div className="flex items-center gap-2 mb-2 text-purple-700 dark:text-purple-300">
+                                                <i className="ph-bold ph-sparkle text-xs"></i>
+                                                <span className="text-[9px] font-bold uppercase tracking-widest">Insight</span>
+                                            </div>
+                                            {isInsightLoading && !insightContent ? (
+                                                <div className="flex gap-1 justify-center py-2 opacity-50">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"></div>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{animationDelay:'0.1s'}}></div>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{animationDelay:'0.2s'}}></div>
+                                                </div>
+                                            ) : (
+                                                <p className="serif-text text-sm leading-relaxed opacity-90 whitespace-pre-wrap text-purple-900 dark:text-purple-100">{insightContent}</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

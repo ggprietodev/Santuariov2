@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { updateUserBirthDate } from '../services/supabase';
 
@@ -70,7 +69,8 @@ export function MementoMori({ onBack, birthDate, onUpdateDate }: MementoMoriProp
             // 3. Cambiar a modo vista localmente (feedback instantáneo)
             setMode('view');
         } else {
-            setError("Error guardando fecha: " + err.message);
+            const errorMsg = typeof err === 'string' ? err : err.message;
+            setError("Error guardando fecha: " + errorMsg);
         }
         setLoading(false);
     };

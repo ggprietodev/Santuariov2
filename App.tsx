@@ -1,32 +1,30 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions, addXP } from './services/supabase';
-import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction, UserProfile } from './types';
-import { getSyncedDailyData, parsePost } from './utils/stoicData';
-import { NavBtn } from './components/Shared';
-import { LevelBadge } from './components/LevelBadge';
+import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions, addXP } from '../services/supabase';
+import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction, UserProfile } from '../types';
+import { getSyncedDailyData, parsePost } from '../utils/stoicData';
+import { NavBtn, UserAvatar } from '../components/Shared';
+import { LevelBadge } from '../components/LevelBadge';
 
 // Views & Modules
 import { TodayView } from './views/Today';
 import { CalendarView } from './views/Calendar';
-import { SettingsModule } from './modules/Settings';
-import { CitadelModule } from './modules/Citadel';
-import { LibraryModule } from './modules/Library';
-import { StatsModule } from './modules/Stats';
-import { ArenaModule } from './modules/Arena';
-import { CommunityHub } from './modules/Community';
-import { LearningModule } from './modules/Learning';
-import { OracleModule } from './modules/Oracle';
-import { PhilosophersModule } from './modules/Philosophers';
-import { GlossaryModule } from './modules/Glossary';
-import { SchoolsModule } from './modules/Schools';
-import { WorksManager } from './modules/WorksManager';
-import { MementoMori } from './modules/MementoMori';
-import { Premeditatio } from './modules/Premeditatio';
+import { SettingsModule } from '../modules/Settings';
+import { CitadelModule } from '../modules/Citadel';
+import { LibraryModule } from '../modules/Library';
+import { StatsModule } from '../modules/Stats';
+import { ArenaModule } from '../modules/Arena';
+import { CommunityHub } from '../modules/Community';
+import { LearningModule } from '../modules/Learning';
+import { OracleModule } from '../modules/Oracle';
+import { PhilosophersModule } from '../modules/Philosophers';
+import { GlossaryModule } from '../modules/Glossary';
+import { SchoolsModule } from '../modules/Schools';
+import { WorksManager } from '../modules/WorksManager';
+import { MementoMori } from '../modules/MementoMori';
+import { Premeditatio } from '../modules/Premeditatio';
 import { AuthView } from './views/AuthView'; 
-import { DayModal } from './components/DayModal';
+import { DayModal } from '../components/DayModal';
 
-// --- SUB-COMPONENTE PARA TARJETAS (Mejora: Reutilización y limpieza) ---
 const SanctuaryCard = ({ id, label, sub, icon, style, onClick }: any) => (
     <button 
         onClick={() => onClick(id)} 
@@ -61,7 +59,7 @@ function SanctuaryView({
     onWorkInteractionUpdate,
     onPlayerToggle,
     theme,
-    onAddXP // Recibido desde App
+    onAddXP 
 }: any) {
     
     const handleModuleBack = () => {
@@ -73,79 +71,83 @@ function SanctuaryView({
         }
     };
 
-    // --- LÓGICA DE ESTILOS PERSONALIZADA Y OPTIMIZADA ---
-    const isCustomTheme = useMemo(() => !['light', 'dark'].includes(theme), [theme]);
-
+    // --- PALETA DE COLORES AVANZADA ---
     const styles = useMemo(() => {
-        const getCardClasses = (defaultColorBg: string, defaultBorder: string, defaultIconColor: string, defaultTitleColor: string, defaultSubColor: string, defaultBox: string) => {
-            if (isCustomTheme) {
-                // Temas Personalizados (Ocean, Forest, Sunset)
-                let cardBg = `bg-[var(--card)]`;
-                let cardBorder = `border-[var(--border)]`;
-                let textColor = `text-[var(--text-main)]`;
-                let subColor = `text-[var(--text-sub)] opacity-60`;
-                let boxClass = `bg-[var(--highlight)] text-[var(--text-main)] border border-[var(--border)]`;
-
-                if (theme === 'ocean') {
-                    cardBg = 'bg-cyan-950';
-                    cardBorder = 'border-cyan-800';
-                    textColor = 'text-cyan-50';
-                    subColor = 'text-cyan-200 opacity-60';
-                    boxClass = 'bg-cyan-900 text-cyan-200 border border-cyan-700 shadow-inner'; 
-                } else if (theme === 'forest') {
-                    cardBg = 'bg-emerald-950';
-                    cardBorder = 'border-emerald-800';
-                    textColor = 'text-emerald-50';
-                    subColor = 'text-emerald-200 opacity-60';
-                    boxClass = 'bg-emerald-900 text-emerald-200 border border-emerald-700 shadow-inner';
-                } else if (theme === 'sunset') {
-                    cardBg = 'bg-orange-950';
-                    cardBorder = 'border-orange-800';
-                    textColor = 'text-orange-50';
-                    subColor = 'text-orange-200 opacity-60';
-                    boxClass = 'bg-orange-900 text-orange-200 border border-orange-700 shadow-inner';
-                }
-
-                return {
-                    card: `${cardBg} ${cardBorder} border shadow-sm group hover:scale-[1.02] duration-300`,
-                    icon: `${textColor}`,
-                    title: textColor,
-                    sub: `text-[9px] uppercase font-bold ${subColor}`,
-                    box: `${boxClass} shadow-sm` 
-                };
-            }
-            
-            // Temas Estándar (Día/Noche)
-            return {
-                card: `${defaultColorBg} ${defaultBorder} border group hover:shadow-md hover:scale-[1.02] duration-300`,
-                icon: defaultIconColor,
-                title: defaultTitleColor,
-                sub: defaultSubColor,
-                box: `${defaultBox} shadow-sm`
+        // 1. TEMA BOSQUE (FOREST) - Monocromático Verde Profundo
+        if (theme === 'forest') {
+            const forestStyle = {
+                card: `bg-[#1a2e1a] border border-emerald-800/30 shadow-sm group hover:bg-[#233b23] transition-all duration-300`,
+                icon: `text-emerald-300`,
+                title: `text-emerald-100`,
+                sub: `text-emerald-400/60 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-emerald-900/30 border border-emerald-800/50 text-emerald-300`
             };
-        };
+            return {
+                path: forestStyle, masters: forestStyle, schools: forestStyle, oracle: forestStyle,
+                library: forestStyle, works: forestStyle, arena: forestStyle, citadel: forestStyle,
+                glossary: forestStyle, memento: forestStyle, premeditatio: forestStyle, stats: forestStyle
+            };
+        }
+
+        // 2. TEMA OCÉANO (OCEAN) - Monocromático Azul Profundo
+        if (theme === 'ocean') {
+            const oceanStyle = {
+                card: `bg-[#0f172a] border border-cyan-800/30 shadow-sm group hover:bg-[#16223d] transition-all duration-300`,
+                icon: `text-cyan-300`,
+                title: `text-cyan-100`,
+                sub: `text-cyan-400/60 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-cyan-900/30 border border-cyan-800/50 text-cyan-300`
+            };
+            return {
+                path: oceanStyle, masters: oceanStyle, schools: oceanStyle, oracle: oceanStyle,
+                library: oceanStyle, works: oceanStyle, arena: oceanStyle, citadel: oceanStyle,
+                glossary: oceanStyle, memento: oceanStyle, premeditatio: oceanStyle, stats: oceanStyle
+            };
+        }
+
+        // 3. TEMA TIERRA (SUNSET) - Monocromático Arcilla/Cálido
+        if (theme === 'sunset') {
+            const sunsetStyle = {
+                card: `bg-[#2c1810] border border-orange-900/30 shadow-sm group hover:bg-[#3a2015] transition-all duration-300`,
+                icon: `text-amber-400`,
+                title: `text-orange-100`,
+                sub: `text-stone-400 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-orange-900/30 border border-orange-800/50 text-amber-400`
+            };
+            return {
+                path: sunsetStyle, masters: sunsetStyle, schools: sunsetStyle, oracle: sunsetStyle,
+                library: sunsetStyle, works: sunsetStyle, arena: sunsetStyle, citadel: sunsetStyle,
+                glossary: sunsetStyle, memento: sunsetStyle, premeditatio: sunsetStyle, stats: sunsetStyle
+            };
+        }
+
+        // 4. DEFAULT (LIGHT/DARK) - Paleta Arcoíris Vibrante & Distintiva
+        const getCardClasses = (color: string) => ({
+            card: `bg-${color}-100 dark:bg-${color}-950/60 border border-${color}-200 dark:border-${color}-800 shadow-sm group hover:scale-[1.02] transition-all duration-300`,
+            icon: `text-${color}-600 dark:text-${color}-400`,
+            title: `text-${color}-900 dark:text-${color}-100`,
+            sub: `text-${color}-700/60 dark:text-${color}-300/60 text-[9px] font-bold uppercase tracking-widest`,
+            box: `bg-${color}-200 dark:bg-${color}-900/50 text-${color}-700 dark:text-${color}-300 shadow-sm border border-${color}-200/50 dark:border-${color}-800`
+        });
 
         return {
-            path: getCardClasses("bg-[#FAF5FF] dark:bg-[#1E1024]", "border-fuchsia-100 dark:border-fuchsia-900/20", "text-fuchsia-500", "text-fuchsia-900 dark:text-fuchsia-50", "text-fuchsia-800 dark:text-fuchsia-200", "bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-600 dark:text-fuchsia-300"),
-            masters: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
-            schools: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-main)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
-            oracle: getCardClasses("bg-purple-50 dark:bg-purple-900/10", "border-purple-100 dark:border-purple-900/20", "text-purple-500/10", "text-purple-900 dark:text-purple-50", "text-purple-800 dark:text-purple-200", "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"),
-            library: getCardClasses("bg-[#FFF7ED] dark:bg-[#2C1810]", "border-orange-100 dark:border-orange-900/20", "text-orange-500/10", "text-orange-900 dark:text-orange-50", "text-orange-800 dark:text-orange-200", "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300"),
-            works: getCardClasses("bg-[#F0FDF4] dark:bg-[#052E16]", "border-emerald-100 dark:border-emerald-900/20", "text-emerald-500/10", "text-emerald-900 dark:text-emerald-50", "text-emerald-800 dark:text-emerald-200", "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300"),
-            arena: getCardClasses("bg-[#FFFBEB] dark:bg-[#2C2410]", "border-amber-100 dark:border-amber-900/20", "text-amber-500", "text-amber-900 dark:text-amber-50", "text-amber-800 dark:text-amber-200", "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300"),
-            citadel: getCardClasses("bg-stone-100 dark:bg-stone-900", "border-[var(--border)]", "text-[var(--text-sub)] opacity-10", "text-[var(--text-main)]", "opacity-60", "bg-[var(--text-main)] text-[var(--bg)]"),
-            glossary: getCardClasses("bg-[var(--card)]", "border-[var(--border)]", "text-[var(--text-sub)]", "text-[var(--text-main)]", "opacity-60", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"),
-            stats: getCardClasses("bg-[#Fdf4f0] dark:bg-[#2e1a16]", "border-rose-100 dark:border-rose-900/20", "text-rose-500", "text-rose-900 dark:text-rose-50", "text-rose-800 dark:text-rose-200", "bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300"),
-            memento: getCardClasses("bg-stone-50 dark:bg-stone-900/30", "border-stone-100 dark:border-stone-800/50", "text-stone-600 dark:text-stone-400", "text-stone-900 dark:text-stone-100", "text-stone-500", "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400"),
-            premeditatio: getCardClasses("bg-zinc-100 dark:bg-zinc-900", "border-zinc-200 dark:border-zinc-800", "text-zinc-500", "text-zinc-900 dark:text-zinc-100", "text-zinc-500", "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"),
+            path: getCardClasses("amber"),      // Camino
+            masters: getCardClasses("sky"),     // Maestros
+            schools: getCardClasses("indigo"),  // Escuelas
+            oracle: getCardClasses("violet"),   // Oráculo
+            library: getCardClasses("orange"),  // Biblioteca
+            works: getCardClasses("emerald"),   // Obras
+            arena: getCardClasses("rose"),      // Arena
+            citadel: getCardClasses("cyan"),    // Ciudadela
+            glossary: getCardClasses("teal"),   // Léxico
+            memento: getCardClasses("stone"),   // Memento
+            premeditatio: getCardClasses("slate"), // Premeditatio
+            stats: getCardClasses("fuchsia"),   // Legado
         };
-    }, [isCustomTheme, theme]);
+    }, [theme]);
 
-    // --- CONFIGURACIÓN DE MENÚ (Mejora: Fácil de editar y reordenar) ---
     const MENU_ITEMS = [
         { id: 'path', label: 'Camino', sub: 'Cursos', icon: 'ph-duotone ph-path', style: styles.path },
-        { id: 'memento', label: 'Memento', sub: 'Tiempo', icon: 'ph-duotone ph-hourglass', style: styles.memento },
-        { id: 'premeditatio', label: 'Premeditatio', sub: 'Adversidad', icon: 'ph-duotone ph-skull', style: styles.premeditatio },
         { id: 'masters', label: 'Maestros', sub: 'Biografías', icon: 'ph-duotone ph-student', style: styles.masters },
         { id: 'schools', label: 'Escuelas', sub: 'Tradiciones', icon: 'ph-duotone ph-columns', style: styles.schools },
         { id: 'oracle', label: 'Oráculo', sub: 'Consultas', icon: 'ph-bold ph-sparkle', style: styles.oracle },
@@ -154,6 +156,8 @@ function SanctuaryView({
         { id: 'arena', label: 'Arena', sub: 'Reto', icon: 'ph-fill ph-sword', style: styles.arena },
         { id: 'citadel', label: 'Ciudadela', sub: 'Meditación', icon: 'ph-bold ph-castle-turret', style: styles.citadel },
         { id: 'glossary', label: 'Léxico', sub: 'Glosario', icon: 'ph-duotone ph-book-bookmark', style: styles.glossary },
+        { id: 'memento', label: 'Memento', sub: 'Tiempo', icon: 'ph-duotone ph-hourglass', style: styles.memento },
+        { id: 'premeditatio', label: 'Premeditatio', sub: 'Adversidad', icon: 'ph-duotone ph-skull', style: styles.premeditatio },
         { id: 'stats', label: 'Legado', sub: 'Stats', icon: 'ph-fill ph-chart-bar', style: styles.stats },
     ];
 
@@ -167,20 +171,15 @@ function SanctuaryView({
                     </div>
                     <div className="flex items-center gap-3">
                          <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
-                         <button onClick={() => onNavigateToProfile(user)} className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] shadow-sm hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden">
-                            {userProfile?.avatar && !userProfile.avatar.startsWith('ph-') ? (
-                                <img src={userProfile.avatar} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
-                            )}
+                         <button onClick={() => onNavigateToProfile(user)} className="rounded-full shadow-sm hover:scale-105 transition-transform overflow-hidden">
+                            <UserAvatar name={user} avatarUrl={userProfile?.avatar} size="md" />
                          </button>
-                         <button onClick={onOpenSettings} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
+                         <button onClick={onOpenSettings} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
                      </div>
                 </div>
 
                 <div className="w-full max-w-2xl px-6 pb-32">
                     <div className="grid grid-cols-2 gap-4 auto-rows-[160px]">
-                        {/* Renderizado dinámico de tarjetas */}
                         {MENU_ITEMS.map((item) => (
                             <SanctuaryCard 
                                 key={item.id}
@@ -219,7 +218,14 @@ export default function App() {
     const [loadingAuth, setLoadingAuth] = useState(true);
 
     // THEME & APPEARANCE STATE
-    const [theme, setTheme] = useState<string>(() => localStorage.getItem('stoic_theme') || 'light');
+    const [theme, setTheme] = useState<string>(() => {
+        // Ensure localStorage is checked correctly
+        const saved = localStorage.getItem('stoic_theme');
+        if (saved) return saved;
+        const hour = new Date().getHours();
+        return (hour >= 7 && hour < 20) ? 'light' : 'dark';
+    });
+
     const [fontTheme, setFontTheme] = useState<'classic' | 'modern' | 'humanist' | 'elegant'>(() => (localStorage.getItem('stoic_font') as any) || 'classic');
     const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>(() => (localStorage.getItem('stoic_size') as any) || 'medium');
 
@@ -237,7 +243,6 @@ export default function App() {
     const [sharedItem, setSharedItem] = useState<SharedItem | null>(null);
     const [communityViewMode, setCommunityViewMode] = useState<'feed' | 'profile'>('feed');
 
-    // Initialize with EMPTY arrays - NO STATIC DATA
     const [masterReadings, setMasterReadings] = useState<Reading[]>([]);
     const [masterPhilosophers, setMasterPhilosophers] = useState<PhilosopherBio[]>([]);
     const [masterSchools, setMasterSchools] = useState<PhilosophySchool[]>([]);
@@ -267,7 +272,6 @@ export default function App() {
     const [dayPosts, setDayPosts] = useState<Post[]>([]);
     const [loadingDayPosts, setLoadingDayPosts] = useState(false);
     
-    // --- APPLY THEME EFFECT ---
     useEffect(() => {
         const root = document.documentElement;
         
@@ -296,7 +300,6 @@ export default function App() {
 
     }, [theme, fontTheme, fontSize]);
 
-    // --- DERIVE DAILY CONTENT ---
     const { dailyReading, dailyPhilosopher, isMatch, dailyMeditation, dailyTask, dailyQuestion } = useMemo(() => {
         if (masterReadings.length === 0) {
             return { dailyReading: null, dailyPhilosopher: null, isMatch: false, dailyMeditation: null, dailyTask: null, dailyQuestion: "..." };
@@ -304,7 +307,6 @@ export default function App() {
         return getSyncedDailyData(new Date(), masterReadings, masterPhilosophers, masterMeditations, masterTasks, masterQuestions);
     }, [masterReadings, masterPhilosophers, masterMeditations, masterTasks, masterQuestions]);
 
-    // --- INITIAL FETCHES ---
     useEffect(() => {
         const loadContent = async () => {
             const works = await fetchWorks();
@@ -338,7 +340,6 @@ export default function App() {
         loadContent();
     }, []); 
 
-    // --- AUTH & USER DATA ---
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -408,6 +409,25 @@ export default function App() {
         setLoadingAuth(false);
     }
 
+    // --- PROFILE UPDATE HANDLER (NEW) ---
+    const handleProfileUpdate = async (updatedProfile: UserProfile) => {
+        // 1. Update local states aggressively
+        setUserProfile(updatedProfile);
+        setUsername(updatedProfile.username); // Sync username state immediately
+        
+        // 2. Persist to DB
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('profiles').update({
+                username: updatedProfile.username,
+                avatar: updatedProfile.avatar,
+                bio: updatedProfile.bio,
+                banner: updatedProfile.banner,
+                website: updatedProfile.website
+            }).eq('id', user.id);
+        }
+    };
+
     const fetchUserLibrary = async (userId: string) => {
         const { data } = await supabase.from('user_library').select('reading_data').eq('user_id', userId);
         if (data) {
@@ -453,21 +473,27 @@ export default function App() {
 
     const handleSaveEntry = useCallback(async (date: string, entry: JournalEntry) => {
         setJournal(prev => ({ ...prev, [date]: entry }));
-        if(session) {
+        
+        // Use fresh user fetch for DB operations to avoid stale session issues
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if(user) {
             const payload = {
-                user_id: session.user.id,
+                user_id: user.id,
                 date: date,
                 mood: entry.mood || 0,
                 text_content: entry.text || "",
                 question_response: entry.question_response || "",
                 challenge_response: entry.challenge_response || "",
                 challenge_completed: entry.challenge_completed === true, 
+                challenge_status: entry.challenge_status,
+                challenge_title: entry.challenge_title,
                 updated_at: new Date().toISOString()
             };
             const { error } = await supabase.from('user_daily_logs').upsert(payload, { onConflict: 'user_id, date' });
             if (error) console.error("Error Saving Log:", error.message || error);
         }
-    }, [session]);
+    }, []);
 
     const handleUpdateToday = (overrides: Partial<JournalEntry>) => { 
         const todayStr = getISO();
@@ -483,10 +509,7 @@ export default function App() {
             newSaved = savedReadings.filter(r => r.q !== reading.q);
         } else {
             newSaved = [...savedReadings, { ...reading, saved: true }];
-            // REWARD: Add XP for saving a reading
-            if (session?.user?.id) {
-                handleAddXP(10);
-            }
+            if (session?.user?.id) handleAddXP(10);
         }
         setSavedReadings(newSaved);
         if (session) {
@@ -542,7 +565,6 @@ export default function App() {
     const handleNavigateToChallenge = () => { setActiveChallenge({ title: dailyTask?.title || "Reto", task: dailyTask?.description || "..." }); setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('arena'); };
     const handleNavigateToPath = () => { setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('path'); }
 
-    // --- GAMIFICATION HANDLER ---
     const handleAddXP = async (amount: number) => {
         if (!session?.user?.id) return;
         const result = await addXP(session.user.id, amount);
@@ -565,7 +587,7 @@ export default function App() {
                 {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} onAddXP={handleAddXP} userProfile={userProfile} />}
                 {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} userProfile={userProfile} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} />}
                 {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} userProfile={userProfile} onAddXP={handleAddXP} />}
-                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} userProfile={userProfile} updateUserProfile={setUserProfile} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} onAddXP={handleAddXP} />}
+                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} userProfile={userProfile} updateUserProfile={handleProfileUpdate} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} onAddXP={handleAddXP} />}
              </main>
              
              {/* Main Navbar */}

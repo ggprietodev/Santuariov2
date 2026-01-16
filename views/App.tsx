@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, getISO, signOut, fetchUserLibraryInteractions, fetchUserBookmarks, togglePostBookmarkDB, fetchWorks, fetchMeditations, fetchGlossary, fetchFullCourses, fetchPhilosophers, fetchReadings, fetchSchools, fetchTasks, fetchDailyQuestions, addXP } from '../services/supabase';
 import type { JournalEntry, Reading, Post, ParsedContent, LearningReflection, PhilosopherBio, SharedItem, PhilosophySchool, GlossaryTerm, Module, Task, DichotomyScenario, Work, Meditation, Course, WorkInteraction, UserProfile } from '../types';
 import { getSyncedDailyData, parsePost } from '../utils/stoicData';
 import { NavBtn, UserAvatar } from '../components/Shared';
 import { LevelBadge } from '../components/LevelBadge';
+import { UniversalSearchModal } from '../components/UniversalSearchModal'; 
 
 // Views & Modules
 import { TodayView } from './Today';
@@ -47,7 +49,7 @@ function SanctuaryView({
     learningReflections, saveLearningReflection, activeChallenge, setActiveChallenge, followedPhilosophers, 
     toggleFollowPhilosopher, dailyPhilosopher, onShare, onNavigateToProfile, onOpenSettings,
     masterReadings, masterPhilosophers, masterSchools, masterGlossary, masterModules, masterCourses, masterTasks, masterDichotomies, masterWorks, masterMeditations,
-    onWorkAdded, onWorkDeleted, initialActiveMeditation, initialSelectedPhilosopherId,
+    onWorkAdded, onWorkDeleted, initialActiveMeditation, initialSelectedPhilosopherId, initialSelectedSchool,
     clearDeepLink, returnToToday, setReturnToToday, 
     handleNavigateToPhilosopher, 
     handleNavigateToSchool,
@@ -59,7 +61,8 @@ function SanctuaryView({
     onWorkInteractionUpdate,
     onPlayerToggle,
     theme,
-    onAddXP 
+    onAddXP,
+    onOpenSearch 
 }: any) {
     
     const handleModuleBack = () => {
@@ -71,37 +74,73 @@ function SanctuaryView({
         }
     };
 
-    // --- COLOR LOGIC: FORZAMOS COLORES VIBRANTES SIEMPRE ---
+    // --- PALETA DE COLORES AVANZADA ---
     const styles = useMemo(() => {
-        // ELIMINAMOS LA RESTRICCION DE TEMA PARA QUE SIEMPRE SE VEAN LOS COLORES
-        // const isCustomTheme = !['light', 'dark'].includes(theme);
-
-        // Helper to build card classes
-        const getCardClasses = (bgClass: string, textClass: string, subClass: string, boxClass: string) => {
-            // SIEMPRE DEVOLVEMOS EL COLOR ESPECÍFICO
-            return {
-                card: `${bgClass} border border-transparent shadow-sm group hover:scale-[1.02] duration-300`,
-                icon: textClass,
-                title: textClass,
-                sub: `${subClass} text-[9px] uppercase font-bold tracking-widest opacity-70`,
-                box: `${boxClass} shadow-sm`
+        // ... (Theme logic same as before) ...
+        if (theme === 'forest') {
+            const forestStyle = {
+                card: `bg-[#1a2e1a] border border-emerald-800/30 shadow-sm group hover:bg-[#233b23] transition-all duration-300`,
+                icon: `text-emerald-300`,
+                title: `text-emerald-100`,
+                sub: `text-emerald-400/60 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-emerald-900/30 border border-emerald-800/50 text-emerald-300`
             };
-        };
+            return {
+                path: forestStyle, masters: forestStyle, schools: forestStyle, oracle: forestStyle,
+                library: forestStyle, works: forestStyle, arena: forestStyle, citadel: forestStyle,
+                glossary: forestStyle, memento: forestStyle, premeditatio: forestStyle, stats: forestStyle
+            };
+        }
+        if (theme === 'ocean') {
+            const oceanStyle = {
+                card: `bg-[#0f172a] border border-cyan-800/30 shadow-sm group hover:bg-[#16223d] transition-all duration-300`,
+                icon: `text-cyan-300`,
+                title: `text-cyan-100`,
+                sub: `text-cyan-400/60 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-cyan-900/30 border border-cyan-800/50 text-cyan-300`
+            };
+            return {
+                path: oceanStyle, masters: oceanStyle, schools: oceanStyle, oracle: oceanStyle,
+                library: oceanStyle, works: oceanStyle, arena: oceanStyle, citadel: oceanStyle,
+                glossary: oceanStyle, memento: oceanStyle, premeditatio: oceanStyle, stats: oceanStyle
+            };
+        }
+        if (theme === 'sunset') {
+            const sunsetStyle = {
+                card: `bg-[#2c1810] border border-orange-900/30 shadow-sm group hover:bg-[#3a2015] transition-all duration-300`,
+                icon: `text-amber-400`,
+                title: `text-orange-100`,
+                sub: `text-stone-400 text-[9px] font-bold uppercase tracking-widest`,
+                box: `bg-orange-900/30 border border-orange-800/50 text-amber-400`
+            };
+            return {
+                path: sunsetStyle, masters: sunsetStyle, schools: sunsetStyle, oracle: sunsetStyle,
+                library: sunsetStyle, works: sunsetStyle, arena: sunsetStyle, citadel: sunsetStyle,
+                glossary: sunsetStyle, memento: sunsetStyle, premeditatio: sunsetStyle, stats: sunsetStyle
+            };
+        }
 
-        // Distinct Palette Mapping
+        const getCardClasses = (color: string) => ({
+            card: `bg-${color}-100 dark:bg-${color}-950/60 border border-${color}-200 dark:border-${color}-800 shadow-sm group hover:scale-[1.02] transition-all duration-300`,
+            icon: `text-${color}-600 dark:text-${color}-400`,
+            title: `text-${color}-900 dark:text-${color}-100`,
+            sub: `text-${color}-700/60 dark:text-${color}-300/60 text-[9px] font-bold uppercase tracking-widest`,
+            box: `bg-${color}-200 dark:bg-${color}-900/50 text-${color}-700 dark:text-${color}-300 shadow-sm border border-${color}-200/50 dark:border-${color}-800`
+        });
+
         return {
-            path: getCardClasses("bg-fuchsia-50 dark:bg-fuchsia-950", "text-fuchsia-900 dark:text-fuchsia-100", "text-fuchsia-700 dark:text-fuchsia-300", "bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-600 dark:text-fuchsia-300"),
-            masters: getCardClasses("bg-sky-50 dark:bg-sky-950", "text-sky-900 dark:text-sky-100", "text-sky-700 dark:text-sky-300", "bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-300"),
-            schools: getCardClasses("bg-indigo-50 dark:bg-indigo-950", "text-indigo-900 dark:text-indigo-100", "text-indigo-700 dark:text-indigo-300", "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300"),
-            oracle: getCardClasses("bg-violet-50 dark:bg-violet-950", "text-violet-900 dark:text-violet-100", "text-violet-700 dark:text-violet-300", "bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300"),
-            library: getCardClasses("bg-orange-50 dark:bg-orange-950", "text-orange-900 dark:text-orange-100", "text-orange-700 dark:text-orange-300", "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300"),
-            works: getCardClasses("bg-emerald-50 dark:bg-emerald-950", "text-emerald-900 dark:text-emerald-100", "text-emerald-700 dark:text-emerald-300", "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300"),
-            arena: getCardClasses("bg-amber-50 dark:bg-amber-950", "text-amber-900 dark:text-amber-100", "text-amber-700 dark:text-amber-300", "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300"),
-            citadel: getCardClasses("bg-slate-50 dark:bg-slate-900", "text-slate-900 dark:text-slate-100", "text-slate-600 dark:text-slate-400", "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"),
-            glossary: getCardClasses("bg-teal-50 dark:bg-teal-950", "text-teal-900 dark:text-teal-100", "text-teal-700 dark:text-teal-300", "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-300"),
-            stats: getCardClasses("bg-rose-50 dark:bg-rose-950", "text-rose-900 dark:text-rose-100", "text-rose-700 dark:text-rose-300", "bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300"),
-            memento: getCardClasses("bg-zinc-50 dark:bg-zinc-900", "text-zinc-900 dark:text-zinc-100", "text-zinc-600 dark:text-zinc-400", "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"),
-            premeditatio: getCardClasses("bg-purple-50 dark:bg-purple-950", "text-purple-900 dark:text-purple-100", "text-purple-700 dark:text-purple-300", "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300"),
+            path: getCardClasses("amber"),      
+            masters: getCardClasses("sky"),     
+            schools: getCardClasses("indigo"),  
+            oracle: getCardClasses("violet"),   
+            library: getCardClasses("orange"),  
+            works: getCardClasses("emerald"),   
+            arena: getCardClasses("rose"),      
+            citadel: getCardClasses("cyan"),    
+            glossary: getCardClasses("teal"),   
+            memento: getCardClasses("stone"),   
+            premeditatio: getCardClasses("slate"), 
+            stats: getCardClasses("fuchsia"),   
         };
     }, [theme]);
 
@@ -130,14 +169,13 @@ function SanctuaryView({
                     </div>
                     <div className="flex items-center gap-3">
                          <LevelBadge xp={userProfile?.xp || 0} showLabel={false} />
-                         <button onClick={() => onNavigateToProfile(user)} className="w-10 h-10 rounded-full bg-[var(--highlight)] flex items-center justify-center border border-[var(--border)] shadow-sm hover:bg-[var(--text-main)] hover:text-[var(--bg)] transition-colors overflow-hidden">
-                            {userProfile?.avatar && !userProfile.avatar.startsWith('ph-') ? (
-                                <img src={userProfile.avatar} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="text-sm font-bold">{user && user[0] ? user[0].toUpperCase() : 'E'}</div>
-                            )}
+                         <button onClick={onOpenSearch} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors">
+                            <i className="ph-bold ph-magnifying-glass"></i>
                          </button>
-                         <button onClick={onOpenSettings} className="w-10 h-10 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
+                         <button onClick={() => onNavigateToProfile(user)} className="rounded-full shadow-sm hover:scale-105 transition-transform overflow-hidden">
+                            <UserAvatar name={user} avatarUrl={userProfile?.avatar} size="md" />
+                         </button>
+                         <button onClick={onOpenSettings} className="w-9 h-9 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)] shadow-sm text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors"><i className="ph-bold ph-gear"></i></button>
                      </div>
                 </div>
 
@@ -169,7 +207,7 @@ function SanctuaryView({
             {sanctuaryMode === 'path' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><LearningModule userId={userId} onBack={handleModuleBack} setActiveChallenge={setActiveChallenge} onNavigateToArena={() => setSanctuaryMode('arena')} modules={masterModules} courses={masterCourses} /></div>}
             {sanctuaryMode === 'masters' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><PhilosophersModule readings={masterReadings} philosophers={masterPhilosophers} works={masterWorks} savedReadings={savedReadings} toggleSave={toggleSave} onBack={handleModuleBack} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} initialSelectedPhilosopherId={initialSelectedPhilosopherId} onNavigateToSchool={handleNavigateToSchool} /></div>}
             {sanctuaryMode === 'glossary' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><GlossaryModule onBack={handleModuleBack} terms={masterGlossary} onNavigateToSchool={handleNavigateToSchool} onNavigateToPhilosopher={handleNavigateToPhilosopher} /></div>}
-            {sanctuaryMode === 'schools' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><SchoolsModule readings={masterReadings} schools={masterSchools} philosophers={masterPhilosophers} works={masterWorks} onBack={handleModuleBack} toggleSave={toggleSave} savedReadings={savedReadings} onNavigateToPhilosopher={handleNavigateToPhilosopher} /></div>}
+            {sanctuaryMode === 'schools' && <div className="absolute inset-0 bg-[var(--bg)] z-10"><SchoolsModule readings={masterReadings} schools={masterSchools} philosophers={masterPhilosophers} works={masterWorks} onBack={handleModuleBack} toggleSave={toggleSave} savedReadings={savedReadings} onNavigateToPhilosopher={handleNavigateToPhilosopher} initialSelectedSchool={initialSelectedSchool} /></div>}
         </div>
     )
 }
@@ -180,14 +218,15 @@ export default function App() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
 
+    // GLOBAL SEARCH STATE
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
     // THEME & APPEARANCE STATE
-    // Initialize Theme: Check localStorage -> Check Time of Day -> Default
     const [theme, setTheme] = useState<string>(() => {
+        // Ensure localStorage is checked correctly
         const saved = localStorage.getItem('stoic_theme');
         if (saved) return saved;
-        
         const hour = new Date().getHours();
-        // Day: 7 AM - 8 PM (20:00). Night otherwise.
         return (hour >= 7 && hour < 20) ? 'light' : 'dark';
     });
 
@@ -201,6 +240,7 @@ export default function App() {
 
     const [targetMeditation, setTargetMeditation] = useState<Meditation | null>(null);
     const [targetPhilosopherId, setTargetPhilosopherId] = useState<string | null>(null);
+    const [targetSchoolName, setTargetSchoolName] = useState<string | null>(null);
     const [profileTargetUser, setProfileTargetUser] = useState<string | null>(null); 
     const [returnToToday, setReturnToToday] = useState(false); 
 
@@ -208,7 +248,6 @@ export default function App() {
     const [sharedItem, setSharedItem] = useState<SharedItem | null>(null);
     const [communityViewMode, setCommunityViewMode] = useState<'feed' | 'profile'>('feed');
 
-    // Initialize with EMPTY arrays - NO STATIC DATA
     const [masterReadings, setMasterReadings] = useState<Reading[]>([]);
     const [masterPhilosophers, setMasterPhilosophers] = useState<PhilosopherBio[]>([]);
     const [masterSchools, setMasterSchools] = useState<PhilosophySchool[]>([]);
@@ -238,10 +277,9 @@ export default function App() {
     const [dayPosts, setDayPosts] = useState<Post[]>([]);
     const [loadingDayPosts, setLoadingDayPosts] = useState(false);
     
-    // --- APPLY THEME EFFECT ---
     useEffect(() => {
         const root = document.documentElement;
-        
+        // ... (Font theme logic same as before) ...
         if(fontTheme === 'classic') {
             root.style.setProperty('--font-serif', '"Playfair Display", serif');
             root.style.setProperty('--font-text', '"Lora", serif');
@@ -267,7 +305,6 @@ export default function App() {
 
     }, [theme, fontTheme, fontSize]);
 
-    // --- DERIVE DAILY CONTENT ---
     const { dailyReading, dailyPhilosopher, isMatch, dailyMeditation, dailyTask, dailyQuestion } = useMemo(() => {
         if (masterReadings.length === 0) {
             return { dailyReading: null, dailyPhilosopher: null, isMatch: false, dailyMeditation: null, dailyTask: null, dailyQuestion: "..." };
@@ -275,7 +312,6 @@ export default function App() {
         return getSyncedDailyData(new Date(), masterReadings, masterPhilosophers, masterMeditations, masterTasks, masterQuestions);
     }, [masterReadings, masterPhilosophers, masterMeditations, masterTasks, masterQuestions]);
 
-    // --- INITIAL FETCHES ---
     useEffect(() => {
         const loadContent = async () => {
             const works = await fetchWorks();
@@ -309,7 +345,6 @@ export default function App() {
         loadContent();
     }, []); 
 
-    // --- AUTH & USER DATA ---
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -379,6 +414,22 @@ export default function App() {
         setLoadingAuth(false);
     }
 
+    const handleProfileUpdate = async (updatedProfile: UserProfile) => {
+        setUserProfile(updatedProfile);
+        setUsername(updatedProfile.username); 
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('profiles').update({
+                username: updatedProfile.username,
+                avatar: updatedProfile.avatar,
+                bio: updatedProfile.bio,
+                banner: updatedProfile.banner,
+                website: updatedProfile.website
+            }).eq('id', user.id);
+        }
+    };
+
     const fetchUserLibrary = async (userId: string) => {
         const { data } = await supabase.from('user_library').select('reading_data').eq('user_id', userId);
         if (data) {
@@ -424,21 +475,24 @@ export default function App() {
 
     const handleSaveEntry = useCallback(async (date: string, entry: JournalEntry) => {
         setJournal(prev => ({ ...prev, [date]: entry }));
-        if(session) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if(user) {
             const payload = {
-                user_id: session.user.id,
+                user_id: user.id,
                 date: date,
                 mood: entry.mood || 0,
                 text_content: entry.text || "",
                 question_response: entry.question_response || "",
                 challenge_response: entry.challenge_response || "",
                 challenge_completed: entry.challenge_completed === true, 
+                challenge_status: entry.challenge_status,
+                challenge_title: entry.challenge_title,
                 updated_at: new Date().toISOString()
             };
             const { error } = await supabase.from('user_daily_logs').upsert(payload, { onConflict: 'user_id, date' });
             if (error) console.error("Error Saving Log:", error.message || error);
         }
-    }, [session]);
+    }, []);
 
     const handleUpdateToday = (overrides: Partial<JournalEntry>) => { 
         const todayStr = getISO();
@@ -454,10 +508,7 @@ export default function App() {
             newSaved = savedReadings.filter(r => r.q !== reading.q);
         } else {
             newSaved = [...savedReadings, { ...reading, saved: true }];
-            // REWARD: Add XP for saving a reading
-            if (session?.user?.id) {
-                handleAddXP(10);
-            }
+            if (session?.user?.id) handleAddXP(10);
         }
         setSavedReadings(newSaved);
         if (session) {
@@ -504,16 +555,37 @@ export default function App() {
         setSelectedDebate(post); 
     };
     
-    const clearDeepLink = () => { setTargetPhilosopherId(null); setReturnToToday(false); setView('today'); }
+    const clearDeepLink = () => { 
+        setTargetPhilosopherId(null); 
+        setTargetSchoolName(null);
+        setReturnToToday(false); 
+        setView('today'); 
+    }
     const handleNavigateToProfile = (usernameToView: string) => { setProfileTargetUser(usernameToView || username); }
 
     const handleNavigateToMeditation = (meditation: Meditation) => { setTargetMeditation(meditation); setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('citadel'); };
-    const handleNavigateToPhilosopher = (id: string) => { const bio = masterPhilosophers.find(p => p.id === id || p.name.toLowerCase() === id.toLowerCase()); if(bio) { setTargetPhilosopherId(bio.id); setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('masters'); } };
-    const handleNavigateToSchool = (name: string) => { setView('sanctuary'); setSanctuaryMode('schools'); };
+    
+    const handleNavigateToPhilosopher = (id: string) => { 
+        // Try to match ID or Name
+        const bio = masterPhilosophers.find(p => p.id === id || p.name.toLowerCase() === id.toLowerCase()); 
+        if(bio) { 
+            setTargetPhilosopherId(bio.id); 
+            setReturnToToday(true); 
+            setView('sanctuary'); 
+            setSanctuaryMode('masters'); 
+        } 
+    };
+
+    const handleNavigateToSchool = (name: string) => { 
+        setTargetSchoolName(name);
+        setReturnToToday(true); 
+        setView('sanctuary'); 
+        setSanctuaryMode('schools'); 
+    };
+
     const handleNavigateToChallenge = () => { setActiveChallenge({ title: dailyTask?.title || "Reto", task: dailyTask?.description || "..." }); setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('arena'); };
     const handleNavigateToPath = () => { setReturnToToday(true); setView('sanctuary'); setSanctuaryMode('path'); }
 
-    // --- GAMIFICATION HANDLER ---
     const handleAddXP = async (amount: number) => {
         if (!session?.user?.id) return;
         const result = await addXP(session.user.id, amount);
@@ -533,10 +605,10 @@ export default function App() {
     return (
         <div className="flex flex-col h-[100dvh] bg-[var(--bg)] text-[var(--text-main)] overflow-hidden font-sans relative transition-colors duration-500">
              <main className="flex-1 overflow-y-auto no-scrollbar pb-24">
-                {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} onAddXP={handleAddXP} userProfile={userProfile} />}
-                {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} userProfile={userProfile} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} />}
-                {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} userProfile={userProfile} onAddXP={handleAddXP} />}
-                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} userProfile={userProfile} updateUserProfile={setUserProfile} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} onAddXP={handleAddXP} />}
+                {view === 'today' && <TodayView journal={journal} onSaveEntry={handleSaveEntry} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onNavigateToArena={handleNavigateToChallenge} onNavigateToMasters={() => { setView('sanctuary'); setSanctuaryMode('masters'); }} onNavigateToPath={handleNavigateToPath} onToggleSaveQuote={toggleSave} savedReadings={savedReadings} dailyReading={dailyReading} dailyPhilosopher={dailyPhilosopher} isPhilosopherMatch={isMatch} dailyMeditation={dailyMeditation} dailyTask={dailyTask} dailyQuestion={dailyQuestion} onNavigateToChallenge={handleNavigateToChallenge} onNavigateToMeditation={handleNavigateToMeditation} onNavigateToPhilosopher={handleNavigateToPhilosopher} onShare={handleShare} user={username} currentReads={currentReads} onAddXP={handleAddXP} userProfile={userProfile} onOpenSearch={() => setIsSearchOpen(true)} />}
+                {view === 'calendar' && <CalendarView journal={journal} openDay={setModalDay} user={username} userProfile={userProfile} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSearch={() => setIsSearchOpen(true)} />}
+                {view === 'community' && <CommunityHub user={username} userId={session?.user?.id} selectedDebate={selectedDebate} setSelectedDebate={setSelectedDebate} onBack={() => { setView('today'); setCommunityViewMode('feed'); }} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialSharedItem={sharedItem} onClearSharedItem={() => setSharedItem(null)} initialViewMode={communityViewMode} onOpenSettings={() => setIsSettingsOpen(true)} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} userProfile={userProfile} onAddXP={handleAddXP} onOpenSearch={() => setIsSearchOpen(true)} />}
+                {view === 'sanctuary' && <SanctuaryView user={username} userId={session?.user?.id} userProfile={userProfile} updateUserProfile={handleProfileUpdate} savedReadings={savedReadings} toggleSave={toggleSave} journal={journal} sanctuaryMode={sanctuaryMode} setSanctuaryMode={setSanctuaryMode} onUpdateEntry={handleUpdateToday} learningReflections={learningReflections} saveLearningReflection={saveLearningReflection} activeChallenge={activeChallenge} setActiveChallenge={setActiveChallenge} followedPhilosophers={followedPhilosophers} toggleFollowPhilosopher={toggleFollowPhilosopher} dailyPhilosopher={dailyPhilosopher} onShare={handleShare} onNavigateToProfile={() => handleNavigateToProfile(username)} onOpenSettings={() => setIsSettingsOpen(true)} masterReadings={masterReadings} masterPhilosophers={masterPhilosophers} masterSchools={masterSchools} masterGlossary={masterGlossary} masterModules={masterModules} masterCourses={masterCourses} masterTasks={masterTasks} masterDichotomies={masterDichotomies} masterWorks={masterWorks} masterMeditations={masterMeditations} onWorkAdded={handleWorkAdded} onWorkDeleted={handleWorkDeleted} initialActiveMeditation={targetMeditation} initialSelectedPhilosopherId={targetPhilosopherId} initialSelectedSchool={targetSchoolName} clearDeepLink={clearDeepLink} returnToToday={returnToToday} setReturnToToday={setReturnToToday} handleNavigateToPhilosopher={handleNavigateToPhilosopher} handleNavigateToSchool={handleNavigateToSchool} handleNavigateToChallenge={handleNavigateToChallenge} handleNavigateToPath={handleNavigateToPath} handleNavigateToMeditation={handleNavigateToMeditation} dailyTask={dailyTask} userInteractions={userInteractions} onWorkInteractionUpdate={handleWorkInteractionUpdate} onPlayerToggle={setIsPlayerActive} theme={theme} onAddXP={handleAddXP} onOpenSearch={() => setIsSearchOpen(true)} />}
              </main>
              
              {/* Main Navbar */}
@@ -551,6 +623,17 @@ export default function App() {
              
              {isSettingsOpen && <SettingsModule user={username} setUser={setUsername} theme={theme} setTheme={setTheme} fontTheme={fontTheme} setFontTheme={setFontTheme} fontSize={fontSize} setFontSize={setFontSize} onBack={() => setIsSettingsOpen(false)} onLogout={handleLogout} journal={journal} masterSchools={masterSchools} masterPhilosophers={masterPhilosophers} onAddXP={handleAddXP} />}
              
+             {/* UNIVERSAL SEARCH MODAL */}
+             <UniversalSearchModal 
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+                onNavigateToProfile={handleNavigateToProfile}
+                onNavigateToPost={handleOpenPost}
+                onNavigateToPhilosopher={handleNavigateToPhilosopher}
+                onNavigateToSchool={handleNavigateToSchool}
+                onNavigateToReading={(r) => { setView('sanctuary'); setSanctuaryMode('library'); }} // Simplified for now
+             />
+
              {profileTargetUser && (
                 <div className="fixed inset-0 z-[60] bg-[var(--bg)] animate-fade-in flex flex-col">
                     <CommunityHub user={username} userId={session?.user?.id} selectedDebate={null} setSelectedDebate={() => {}} onBack={() => setProfileTargetUser(null)} bookmarkedPosts={bookmarkedPosts} toggleBookmarkPost={toggleBookmarkPost} initialViewMode='profile' initialProfileTarget={profileTargetUser} onOpenSettings={() => {}} onNavigateToProfile={handleNavigateToProfile} journal={journal} dailyTopic={dailyQuestion} />

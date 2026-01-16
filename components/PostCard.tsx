@@ -26,20 +26,24 @@ const TagBadge = ({ tag }: { tag?: string }) => {
     // Special handling for Daily Debates
     if (tag.startsWith('Diario:')) {
         return (
-            <div className="inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-widest text-purple-700 bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 shadow-sm gap-1">
+            <div className="inline-flex items-center px-3 py-1 rounded-full border text-[9px] font-bold uppercase tracking-widest text-purple-700 bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 shadow-sm gap-1 font-mono">
                 <i className="ph-fill ph-sparkle"></i> Diario
             </div>
         );
     }
 
     const styles: Record<string, string> = {
-        'Debate': 'text-sky-600 bg-sky-50 dark:bg-sky-900/30 border-sky-100 dark:border-sky-800',
-        'Victoria': 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-100 dark:border-emerald-800',
-        'Pregunta': 'text-purple-600 bg-purple-50 dark:bg-purple-900/30 border-purple-100 dark:border-purple-800',
-        'Cita': 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800',
-        'Ensayo': 'text-rose-600 bg-rose-50 dark:bg-rose-900/30 border-rose-100 dark:border-rose-800',
+        'Debate': 'text-sky-600 bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800',
+        'Victoria': 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+        'Pregunta': 'text-purple-600 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800',
+        'Cita': 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+        'Ensayo': 'text-rose-600 bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800',
     };
-    return <div className={`inline-flex items-center px-1.5 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-wider ${styles[tag] || 'text-[var(--text-sub)] bg-[var(--highlight)]'}`}>{tag}</div>;
+    return (
+        <div className={`inline-flex items-center px-3 py-1 rounded-full border text-[9px] font-bold uppercase tracking-widest font-mono ${styles[tag] || 'text-[var(--text-sub)] bg-[var(--highlight)] border-[var(--border)]'}`}>
+            {tag}
+        </div>
+    );
 };
 
 const SharedItemCard = ({ item }: { item: SharedItem }) => {
@@ -161,7 +165,9 @@ export const PostCard: React.FC<PostCardProps> = ({
                 </div>
                 
                 <h3 className="serif text-base sm:text-lg font-bold mb-2 leading-tight group-hover:text-[var(--gold)] transition-colors">{c.title || "Sin Título"}</h3>
-                <p className="serif-text text-xs opacity-80 line-clamp-3 mb-3 leading-relaxed">{c.body}</p>
+                <p className="serif-text text-xs opacity-80 line-clamp-3 mb-3 leading-relaxed">
+                    {formatBodyText(c.body, onViewProfile)}
+                </p>
                 
                 <div className="flex items-center justify-between border-t border-[var(--border)] pt-2 mt-2">
                      <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{readTime}</span>
@@ -189,7 +195,9 @@ export const PostCard: React.FC<PostCardProps> = ({
 
                 <div className="pl-8">
                     {c.title && <h3 className="serif text-sm font-bold mb-1 leading-tight group-hover:text-sky-600 transition-colors line-clamp-1">{c.title}</h3>}
-                    <p className="serif-text text-xs opacity-80 line-clamp-2 leading-relaxed mb-2">{c.body}</p>
+                    <div className="serif-text text-xs opacity-80 line-clamp-2 leading-relaxed mb-2">
+                        {formatBodyText(c.body, onViewProfile)}
+                    </div>
                     
                     <div className="flex items-center gap-4 text-[var(--text-sub)] opacity-50">
                         <div className="flex items-center gap-1 text-[10px] font-bold">
@@ -267,7 +275,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                     <div className={`${isVisual ? `p-6 rounded-2xl shadow-sm mb-3 ${styleClass} flex flex-col items-center justify-center text-center min-h-[160px]` : ''}`}>
                         {isVisual && <i className="ph-fill ph-quotes text-3xl opacity-30 mb-3"></i>}
                         <div className={`serif-text leading-relaxed whitespace-pre-wrap ${isVisual ? 'text-base font-medium' : `text-xs sm:text-sm text-[var(--text-main)] opacity-90`} ${!isDetail && !isVisual ? 'line-clamp-6' : ''}`}>
-                            {formatBodyText(c.body)}
+                            {formatBodyText(c.body, onViewProfile)}
                         </div>
                     </div>
 

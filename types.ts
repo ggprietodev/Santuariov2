@@ -28,15 +28,15 @@ export interface JournalEntry {
 }
 
 export interface PremeditatioLog {
-    id?: string;
-    user_id?: string;
+    id: string; // ¡Tiene que ser string (UUID)!
+    user_id: string;
     created_at?: string;
     event_context: string;
     worst_case: string;
     prevention: string;
     virtue_response: string;
-    confidence_score?: number; // Added
-    mantra?: string; // Added
+    confidence_score?: number;
+    mantra?: string;
 }
 
 export interface Reading {
